@@ -2,8 +2,8 @@
 	let results: string[] = [];
 
 	async function add() {
-		const response = await fetch('/api/greeting', {
-			method: 'GET'
+		const response = await fetch("/api/analysis", {
+			method: "GET",
 		});
 
 		const resultString = await response.text();
