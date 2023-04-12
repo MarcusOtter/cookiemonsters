@@ -2,13 +2,14 @@
 	let results: string[] = [];
 
 	async function add() {
+		results = [...results, "Loading..."];
 		const response = await fetch("/api/analysis", {
 			method: "GET",
 		});
 
 		const resultString = await response.text();
-		results.push(resultString);
-		results = results;
+		results.pop();
+		results = [...results, resultString];
 	}
 </script>
 

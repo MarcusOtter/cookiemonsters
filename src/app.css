@@ -1,0 +1,58 @@
+/* ONLY GLOBAL CSS IN THIS FILE! */
+/* Inspired by https://www.joshwcomeau.com/css/custom-css-reset/ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	overflow-wrap: break-word;
+}
+
+html {
+	scroll-behavior: smooth;
+	line-height: 1.5;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
+		"Droid Sans", "Helvetica Neue", sans-serif;
+
+	background-color: hsl(20, 6%, 10%);
+	color: hsl(0, 0%, 90%);
+	font-size: 1.2rem;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+a {
+	color: inherit;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+	font: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+}

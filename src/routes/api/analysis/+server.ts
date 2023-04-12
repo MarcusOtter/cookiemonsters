@@ -1,17 +1,28 @@
-import puppeteer from "puppeteer";
+import { getBrowser } from "$lib/server/getBrowser";
+import type { RequestEvent } from "@sveltejs/kit";
 
-export async function GET() {
-	return puppeteerAnalysis();
+export async function GET(request: RequestEvent) {
+	return puppeteerAnalysis(request);
 }
 
-async function puppeteerAnalysis() {
-	const browser = await puppeteer.launch();
+async function puppeteerAnalysis(request: RequestEvent) {
+	console.time("Function total");
+
+	console.time("Puppeteer init");
+	const browser = await getBrowser();
 	const page = await browser.newPage();
+	console.timeEnd("Puppeteer init");
 
-	await page.goto("https://selenium.dev");
+	console.time("Request");
+	await page.goto("https://selenium.dev", { waitUntil: "load" });
 	const h1Element = await page.waitForSelector("h1");
-	const h1 = await h1Element?.getProperty("innerText");
+	console.timeEnd("Request");
 
-	await browser.close();
+	const h1 = await h1Element?.getProperty("innerText");
+	// TODO: add analysis code
+	await page.close();
+
+	console.timeEnd("Function total");
+	console.log();
 	return new Response(`h1 is ${h1}!`);
 }
