@@ -7,6 +7,6 @@ export async function getBrowser() {
 		return browser;
 	}
 
-	browser = await puppeteer.launch();
+	browser = await puppeteer.launch({ defaultViewport: { width: 1920, height: 1080 } });
 	return browser;
 }

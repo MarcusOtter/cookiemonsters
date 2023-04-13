@@ -1,17 +1,8 @@
 <script>
+	import TopBar from "$lib/components/TopBar.svelte";
 	import "../app.css";
 </script>
 
-<header>
-	<nav>
-		<p>Crumbly consent</p>
-	</nav>
-</header>
+<TopBar />
 
 <slot />
-
-<style>
-	nav {
-		background-color: black;
-	}
-</style>
