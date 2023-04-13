@@ -1,12 +1,15 @@
 import puppeteer, { Browser } from "puppeteer";
 
-let browser: Browser;
+let desktopBrowser: Browser;
+let mobileBrowser: Browser;
 
-export async function getBrowser() {
-	if (browser) {
-		return browser;
+export async function getBrowsers() {
+	if (desktopBrowser && mobileBrowser) {
+		return [desktopBrowser, mobileBrowser];
 	}
 
-	browser = await puppeteer.launch({ defaultViewport: { width: 1920, height: 1080 } });
-	return browser;
+	// https://www.browserstack.com/guide/ideal-screen-sizes-for-responsive-design
+	desktopBrowser = await puppeteer.launch({ defaultViewport: { width: 1920, height: 1080 } });
+	mobileBrowser = await puppeteer.launch({ defaultViewport: { width: 360, height: 640 } });
+	return [desktopBrowser, mobileBrowser];
 }

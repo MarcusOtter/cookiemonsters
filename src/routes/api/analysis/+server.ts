@@ -1,4 +1,4 @@
-import { getBrowser } from "$lib/server/getBrowser";
+import { getBrowsers } from "$lib/server/getBrowser";
 import type { ElementHandle } from "puppeteer";
 import type { RequestHandler } from "./$types";
 import AnalysisResult from "$lib/AnalysisResult";
@@ -17,32 +17,28 @@ export const GET = ((request) => {
 }) satisfies RequestHandler;
 
 async function puppeteerAnalysis(url: string) {
-	console.time("Function total");
+	const browsers = await getBrowsers();
+	const results = [];
 
-	console.time("Puppeteer init");
-	const browser = await getBrowser();
-	const page = await browser.newPage();
-	console.timeEnd("Puppeteer init");
+	for (const browser of browsers) {
+		const page = await browser.newPage();
 
-	console.time("Request");
-	await page.goto(url, { waitUntil: "networkidle0" });
+		await page.goto(url, { waitUntil: "networkidle0" });
 
-	const screenshot = await page.screenshot({ encoding: "base64" });
+		const screenshot = await page.screenshot({ encoding: "base64" });
 
-	const headings = await page.$$("h1, h2, h3, h4, h5, h6");
-	const headingStructure = await getHeadingStructure(headings);
+		const headings = await page.$$("h1, h2, h3, h4, h5, h6");
+		const headingStructure = await getHeadingStructure(headings);
 
-	console.timeEnd("Request");
+		// TODO: add analysis code
 
-	// TODO: add analysis code
+		await page.close();
 
-	await page.close();
+		const result = new AnalysisResult(headingStructure, screenshot);
+		results.push(result);
+	}
 
-	console.timeEnd("Function total");
-	console.log();
-
-	const result = new AnalysisResult(headingStructure, screenshot);
-	return new Response(JSON.stringify(result));
+	return new Response(JSON.stringify(results));
 }
 
 async function getHeadingStructure(headings: ElementHandle<HTMLHeadingElement>[]) {
