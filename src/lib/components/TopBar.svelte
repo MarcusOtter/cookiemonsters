@@ -27,7 +27,7 @@
 
 	li {
 		display: inline-block;
-		margin-left: 32px;
+		margin-left: calc(10px + 0.75em);
 	}
 
 	nav {
