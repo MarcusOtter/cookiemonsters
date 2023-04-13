@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type AnalysisResult from "$lib/AnalysisResult";
 
-	let result: AnalysisResult;
+	let result: AnalysisResult | undefined;
 	let isLoading = false;
 	let url = "";
 
@@ -9,6 +9,7 @@
 		if (isLoading) return;
 
 		isLoading = true;
+		result = undefined;
 
 		const urlSearchParams = new URLSearchParams({ url });
 		const response = await fetch(`/api/analysis?${urlSearchParams}`, {
@@ -31,7 +32,7 @@
 	<form on:submit|preventDefault={analyze}>
 		<label for="url">Web address</label>
 		<div class="inputs">
-			<input id="url" bind:value={url} placeholder="https://example.com" required pattern=".*\..*" />
+			<input id="url" bind:value={url} placeholder="https://example.com" required />
 			<button disabled={isLoading}>Analyze</button>
 		</div>
 	</form>
@@ -77,11 +78,22 @@
 
 	.inputs input {
 		flex: 1;
+		padding: 8px 12px;
+		border: none;
 	}
 
 	.inputs button {
-		padding: 4px 16px;
+		padding: 12px 24px;
 		margin-inline-start: 8px;
+		text-transform: uppercase;
+		background-color: hsl(39, 97%, 14%);
+		border: none;
+		color: white;
+	}
+
+	.inputs button:hover {
+		background-color: hsl(39, 97%, 18%);
+		cursor: pointer;
 	}
 
 	h2 {
