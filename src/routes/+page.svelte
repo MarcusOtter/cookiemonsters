@@ -91,7 +91,11 @@
 		color: white;
 	}
 
-	.inputs button:hover {
+	.inputs button:disabled {
+		background-color: hsla(217, 97%, 70%, 0.2);
+	}
+
+	.inputs button:not(:disabled):hover {
 		background-color: hsl(217, 97%, 46%);
 		cursor: pointer;
 	}
