@@ -12,7 +12,7 @@
 <style>
 	header {
 		padding: 16px 32px;
-		background: linear-gradient(hsl(20, 3%, 20%), hsl(20, 3%, 15%));
+		background: linear-gradient(hsl(225, 17%, 20%), hsl(225, 17%, 15%));
 		border-bottom: 1px solid black;
 		box-shadow: 0 0 10px hsla(0, 0%, 0%, 0.3);
 		display: flex;

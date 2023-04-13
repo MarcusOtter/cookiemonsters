@@ -86,13 +86,13 @@
 		padding: 12px 24px;
 		margin-inline-start: 8px;
 		text-transform: uppercase;
-		background-color: hsl(39, 97%, 14%);
+		background-color: hsl(217, 97%, 36%);
 		border: none;
 		color: white;
 	}
 
 	.inputs button:hover {
-		background-color: hsl(39, 97%, 18%);
+		background-color: hsl(217, 97%, 46%);
 		cursor: pointer;
 	}
 
