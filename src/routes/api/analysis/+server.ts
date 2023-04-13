@@ -9,7 +9,7 @@ type LanguagePhrases = {
 };
 
 const commonPhrases: LanguagePhrases = {
-	fi: ["eväste", "salli", "kiellä"],
+	fi: ["eväste", "salli", "kiellä", "hyväksy", "tunniste"],
 	en: ["cookie", "Accept", "Decline"],
 	es: ["cookie", "Aceptar", "Rechazar"],
 	fr: ["cookie", "Accepter", "Refuser"],
@@ -80,7 +80,17 @@ async function puppeteerAnalysis(url: string) {
 
 	const xpathExpression = commonPhrases[language].map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
 
-	const cookieBannerElements = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
+	const elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
+
+	const cookieBannerElements: ElementHandle<Element>[] = [];
+
+	// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.
+	for (let i = 0; i < elementsWithKeyWords.length; i++) {
+		if (await elementsWithKeyWords[i].isIntersectingViewport()) {
+			console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
+			cookieBannerElements.push(elementsWithKeyWords[i]);
+		}
+	}
 
 	console.log(`Found ${cookieBannerElements.length} elements`);
 
@@ -197,8 +207,13 @@ async function hasBackground(element: ElementHandle): Promise<boolean> {
 		const style = getComputedStyle(el);
 		const backgroundColor = style.getPropertyValue("background-color");
 		const background = style.getPropertyValue("background");
-		return { backgroundColor, background };
+		const display = style.getPropertyValue("display");
+		return { backgroundColor, background, display };
 	});
+
+	if (style.display == "none") {
+		return false;
+	}
 
 	return !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
 }
