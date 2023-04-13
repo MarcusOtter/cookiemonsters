@@ -13,8 +13,8 @@ const commonPhrases: LanguagePhrases = {
 	en: ["cookie", "Accept", "Decline"],
 	es: ["cookie", "Aceptar", "Rechazar"],
 	fr: ["cookie", "Accepter", "Refuser"],
-	sv: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera cookies"]
-}
+	sv: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera cookies"],
+};
 
 export const GET = ((request) => {
 	let url = request.url.searchParams.get("url");
@@ -71,18 +71,16 @@ async function puppeteerAnalysis(url: string) {
 		return new Response("Body text empty, could not detect language", { status: 400 }); // Temporary
 	}
 
-	let language = await detectLanguage(bodyText)
+	let language = await detectLanguage(bodyText);
 	console.log(`Found language: ${language}`);
 
 	if (!(language in commonPhrases)) {
 		language = "en"; // Temporary, while we don't have all languages.
 	}
 
-	const xpathExpression = commonPhrases[language]
-		.map((phrase) => `//*[contains(text(), '${phrase}')]`)
-  		.join(' | ');
+	const xpathExpression = commonPhrases[language].map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
 
-	const cookieBannerElements = await page.$x(xpathExpression) as ElementHandle<Element>[];
+	const cookieBannerElements = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
 
 	console.log(`Found ${cookieBannerElements.length} elements`);
 
@@ -94,7 +92,7 @@ async function puppeteerAnalysis(url: string) {
 
 	console.log(`Found cookie banner in ${url}:`);
 
-	const screenshot = await cookieBanner.screenshot({ encoding: "base64" }) as string;
+	const screenshot = (await cookieBanner.screenshot({ encoding: "base64" })) as string;
 
 	// Code analysis ends
 
@@ -141,32 +139,34 @@ async function getHeadingStructure(headings: ElementHandle<HTMLHeadingElement>[]
  * @param {ElementHandle<Element>[]} elements - Array of ElementHandles to find the common ancestor for
  * @returns {Promise<ElementHandle | null>} Resolves to the most common ancestor element with a background color, or null if not found
  */
-async function findMostCommonAncestorWithBackgroundColor(elements: ElementHandle<Element>[]): Promise<ElementHandle | null> {
-	const ancestorCounter = new Map<string, { element: ElementHandle, count: number }>();
-  
+async function findMostCommonAncestorWithBackgroundColor(
+	elements: ElementHandle<Element>[],
+): Promise<ElementHandle | null> {
+	const ancestorCounter = new Map<string, { element: ElementHandle; count: number }>();
+
 	for (const element of elements) {
-	  const ancestor = await findAncestorWithBackgroundColor(element);
-	  if (ancestor !== null) {
-		const objectId = await getElementOpeningTag(ancestor);
-		const counterEntry = ancestorCounter.get(objectId);
-		if (counterEntry) {
-		  counterEntry.count += 1;
-		} else {
-		  ancestorCounter.set(objectId, { element: ancestor, count: 1 });
+		const ancestor = await findAncestorWithBackgroundColor(element);
+		if (ancestor !== null) {
+			const objectId = await getElementOpeningTag(ancestor);
+			const counterEntry = ancestorCounter.get(objectId);
+			if (counterEntry) {
+				counterEntry.count += 1;
+			} else {
+				ancestorCounter.set(objectId, { element: ancestor, count: 1 });
+			}
 		}
-	  }
 	}
-  
+
 	console.log(ancestorCounter.entries());
-  
+
 	if (ancestorCounter.size > 0) {
-	  const mostCommonAncestorEntry = Array.from(ancestorCounter.values()).reduce((a, b) => (a.count > b.count ? a : b));
-	  return mostCommonAncestorEntry.element;
+		const mostCommonAncestorEntry = Array.from(ancestorCounter.values()).reduce((a, b) => (a.count > b.count ? a : b));
+		return mostCommonAncestorEntry.element;
 	} else {
-	  return null;
+		return null;
 	}
 }
-  
+
 /**
  * Traverses up the DOM tree from the given element and finds the first ancestor element with a background color.
  *
@@ -176,8 +176,8 @@ async function findMostCommonAncestorWithBackgroundColor(elements: ElementHandle
 async function findAncestorWithBackgroundColor(element: ElementHandle): Promise<ElementHandle | null> {
 	let currentElement = element;
 
-	while (await currentElement.evaluate((el) => el.tagName) !== 'HTML') {
-		currentElement = (await currentElement.$$('xpath/..'))[0];
+	while ((await currentElement.evaluate((el) => el.tagName)) !== "HTML") {
+		currentElement = (await currentElement.$$("xpath/.."))[0];
 		if (await hasBackground(currentElement)) {
 			return currentElement;
 		}
@@ -185,7 +185,6 @@ async function findAncestorWithBackgroundColor(element: ElementHandle): Promise<
 
 	return null;
 }
-
 
 /**
  * Checks whether the given element has a background color that is not fully transparent.
@@ -196,14 +195,13 @@ async function findAncestorWithBackgroundColor(element: ElementHandle): Promise<
 async function hasBackground(element: ElementHandle): Promise<boolean> {
 	const style = await element.evaluate((el) => {
 		const style = getComputedStyle(el);
-		const backgroundColor = style.getPropertyValue('background-color');
-		const background = style.getPropertyValue('background');
+		const backgroundColor = style.getPropertyValue("background-color");
+		const background = style.getPropertyValue("background");
 		return { backgroundColor, background };
-	  });
+	});
 
-	  return !style.backgroundColor.includes('rgba(0, 0, 0, 0)');
-  
-  }
+	return !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
+}
 
 /**
  * Extracts visible text from the given element and its descendants, excluding text from hidden elements.
@@ -216,27 +214,27 @@ async function hasBackground(element: ElementHandle): Promise<boolean> {
 async function getVisibleText(element: ElementHandle): Promise<string> {
 	return await element.evaluate((el) => {
 		const collectVisibleText = (element: HTMLElement): string => {
-		let visibleText = '';
+			let visibleText = "";
 
-		Array.from(element.childNodes).forEach((child) => {
-			if (child.nodeType === Node.TEXT_NODE) {
-			visibleText += (child as Text).textContent;
-			} else if (child.nodeType === Node.ELEMENT_NODE) {
-			const childElement = child as HTMLElement;
-			const style = getComputedStyle(childElement);
-			if (
-				style.display !== 'none' &&
-				style.visibility !== 'hidden' &&
-				style.opacity !== '0' &&
-				childElement.tagName.toLowerCase() !== 'script' &&
-				childElement.tagName.toLowerCase() !== 'style'
-			) {
-				visibleText += collectVisibleText(childElement);
-			}
-			}
-		});
+			Array.from(element.childNodes).forEach((child) => {
+				if (child.nodeType === Node.TEXT_NODE) {
+					visibleText += (child as Text).textContent;
+				} else if (child.nodeType === Node.ELEMENT_NODE) {
+					const childElement = child as HTMLElement;
+					const style = getComputedStyle(childElement);
+					if (
+						style.display !== "none" &&
+						style.visibility !== "hidden" &&
+						style.opacity !== "0" &&
+						childElement.tagName.toLowerCase() !== "script" &&
+						childElement.tagName.toLowerCase() !== "style"
+					) {
+						visibleText += collectVisibleText(childElement);
+					}
+				}
+			});
 
-		return visibleText;
+			return visibleText;
 		};
 
 		return collectVisibleText(el as HTMLElement);
@@ -253,8 +251,8 @@ async function getVisibleText(element: ElementHandle): Promise<string> {
 async function getElementOpeningTag(element: ElementHandle): Promise<string> {
 	return await element.evaluate((el) => {
 		const openingTag = `<${el.tagName.toLowerCase()}${[...el.attributes]
-		.map((attr) => ` ${attr.name}="${attr.value}"`)
-		.join('')}>`;
+			.map((attr) => ` ${attr.name}="${attr.value}"`)
+			.join("")}>`;
 
 		return openingTag;
 	});
@@ -285,21 +283,20 @@ async function waitTillHTMLRendered(page: Page, timeout = 30000): Promise<void> 
 
 		const bodyHTMLSize = await page.evaluate(() => document.body.innerHTML.length);
 
-		console.log('last: ', lastHTMLSize, ' <> curr: ', currentHTMLSize, ' body html size: ', bodyHTMLSize);
+		console.log("last: ", lastHTMLSize, " <> curr: ", currentHTMLSize, " body html size: ", bodyHTMLSize);
 
 		if (lastHTMLSize !== 0 && currentHTMLSize === lastHTMLSize) {
-		countStableSizeIterations++;
+			countStableSizeIterations++;
 		} else {
-		countStableSizeIterations = 0; // reset the counter
+			countStableSizeIterations = 0; // reset the counter
 		}
 
 		if (countStableSizeIterations >= minStableSizeIterations) {
-		console.log('Page rendered fully..');
-		break;
+			console.log("Page rendered fully..");
+			break;
 		}
 
 		lastHTMLSize = currentHTMLSize;
 		await page.waitForTimeout(checkDurationMsecs);
 	}
 }
-  
