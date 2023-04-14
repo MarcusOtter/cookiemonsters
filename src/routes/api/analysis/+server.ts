@@ -26,13 +26,13 @@ export const GET = ((request) => {
 
 async function puppeteerAnalysis(url: string) {
 	console.time("Function total");
-	console.time("Puppeteer init");
 	const browsers = await getBrowsers();
 	const results = [];
 
 	for (const browser of browsers) {
+		console.time("Puppeteer new page");
 		const page = await browser.newPage();
-		console.timeEnd("Puppeteer init");
+		console.timeEnd("Puppeteer new page");
 
 		console.time("Request");
 		await page.goto(url, { waitUntil: "networkidle0" });

@@ -1,51 +1,26 @@
 <script lang="ts">
-	import type AnalysisResult from "$lib/AnalysisResult";
-
-	let results: AnalysisResult[] = [];
-	let isLoading = false;
 	let url = "";
 
-	async function analyze() {
-		if (isLoading) return;
-
-		isLoading = true;
-		results = [];
-
-		const urlSearchParams = new URLSearchParams({ url });
-		const response = await fetch(`/api/analysis?${urlSearchParams}`, {
-			method: "GET",
-		});
-
-		results = (await response.json()) as AnalysisResult[];
-		isLoading = false;
+	function goToAnalysis() {
+		// TODO: Validation on url?
+		window.location.href = `/analysis?` + new URLSearchParams({ url });
 	}
 </script>
 
-<main>
-	<h1>Analyze your cookie banner GDPR compliance</h1>
-	<p>
-		Lorem ipsum dolor sit, amet consectetur adipisicing elit. Debitis eum sunt corporis dignissimos at aliquam autem
-		excepturi velit recusandae nobis minima, facilis error dolorum aperiam enim ad ipsam voluptatum architecto ipsa
-		delectus quo. Maiores saepe molestias fuga atque animi dolorum nostrum alias nobis
-	</p>
+<h1>Analyze your cookie banner GDPR compliance</h1>
+<p>
+	Lorem ipsum dolor sit, amet consectetur adipisicing elit. Debitis eum sunt corporis dignissimos at aliquam autem
+	excepturi velit recusandae nobis minima, facilis error dolorum aperiam enim ad ipsam voluptatum architecto ipsa
+	delectus quo. Maiores saepe molestias fuga atque animi dolorum nostrum alias nobis
+</p>
 
-	<form on:submit|preventDefault={analyze}>
-		<label for="url">Web address</label>
-		<div class="inputs">
-			<input id="url" bind:value={url} placeholder="https://example.com" required />
-			<button disabled={isLoading}>Analyze</button>
-		</div>
-	</form>
-
-	{#if results.length > 0}
-		<h2>Results</h2>
-		{#each results as result}
-			<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
-		{/each}
-	{:else if isLoading}
-		<h2>Loading...</h2>
-	{/if}
-</main>
+<form on:submit|preventDefault={goToAnalysis}>
+	<label for="url">Web address</label>
+	<div class="inputs">
+		<input id="url" bind:value={url} placeholder="https://example.com" required />
+		<button>Analyze</button>
+	</div>
+</form>
 
 <style>
 	h1 {
@@ -61,12 +36,6 @@
 		display: block;
 		margin-block-start: 48px;
 		text-transform: uppercase;
-	}
-
-	main {
-		margin-inline: auto;
-		padding: 2ch;
-		max-width: 80ch;
 	}
 
 	.inputs {
@@ -97,9 +66,5 @@
 	.inputs button:not(:disabled):hover {
 		background-color: hsl(217, 97%, 46%);
 		cursor: pointer;
-	}
-
-	h2 {
-		margin-block-start: 48px;
 	}
 </style>
