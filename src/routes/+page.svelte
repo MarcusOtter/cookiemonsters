@@ -39,11 +39,9 @@
 
 	{#if results.length > 0}
 		<h2>Results</h2>
-		<img src="data:image/png;base64,{results[0].screenshotBase64}" alt="Desktop screenshot" />
-		<img src="data:image/png;base64,{results[1].screenshotBase64}" alt="Mobile screenshot" />
-		<code>
-			<pre>{results[0].headingStructure}</pre>
-		</code>
+		{#each results as result}
+			<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
+		{/each}
 	{:else if isLoading}
 		<h2>Loading...</h2>
 	{/if}
