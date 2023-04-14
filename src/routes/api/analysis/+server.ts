@@ -25,6 +25,7 @@ export const GET = ((request) => {
 }) satisfies RequestHandler;
 
 async function puppeteerAnalysis(url: string) {
+	console.time("Function total");
 	console.time("Puppeteer init");
 	const browsers = await getBrowsers();
 	const results = [];
