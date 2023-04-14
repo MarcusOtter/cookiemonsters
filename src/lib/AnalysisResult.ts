@@ -1,11 +1,13 @@
-export default class AnalysisResult {
-	public readonly foundBanner: boolean;
-	public readonly resolution: string;
-	public readonly screenshotBase64: string;
+import type ViewportFindResult from "./ViewportFindResult";
 
-	constructor(resolution: string, screenshotBase64: string, foundBanner: boolean) {
-		this.resolution = resolution;
-		this.screenshotBase64 = screenshotBase64;
-		this.foundBanner = foundBanner;
+export default class AnalysisResult {
+	public readonly viewports: ViewportFindResult[];
+	public readonly totalDurationMs: number;
+	public readonly requestDurationMs: number;
+
+	constructor(viewports: ViewportFindResult[], totalDurationMs: number, requestDurationMs: number) {
+		this.viewports = viewports;
+		this.totalDurationMs = totalDurationMs;
+		this.requestDurationMs = requestDurationMs;
 	}
 }
