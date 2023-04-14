@@ -40,9 +40,6 @@
 	{#if result}
 		<h2>Results</h2>
 		<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
-		<code>
-			<pre>{result.headingStructure}</pre>
-		</code>
 	{:else if isLoading}
 		<h2>Loading...</h2>
 	{/if}

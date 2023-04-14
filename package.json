@@ -30,7 +30,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"cld": "^2.9.0",
 		"puppeteer": "^19.8.5"
 	}
 }
