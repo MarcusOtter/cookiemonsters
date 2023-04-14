@@ -1,4 +1,4 @@
-import { getBrowser } from "$lib/server/getBrowser";
+import { getBrowsers } from "$lib/server/getBrowser";
 import type { ElementHandle } from "puppeteer";
 import type { RequestHandler } from "./$types";
 import AnalysisResult from "$lib/AnalysisResult";
@@ -28,43 +28,49 @@ async function puppeteerAnalysis(url: string) {
 	console.time("Function total");
 
 	console.time("Puppeteer init");
-	const browser = await getBrowser();
-	const page = await browser.newPage();
-	console.timeEnd("Puppeteer init");
+	const browsers = await getBrowsers();
+	const results = [];
 
-	console.time("Request");
-	await page.goto(url, { waitUntil: "networkidle0" });
-	console.timeEnd("Request");
+	for (const browser of browsers) {
+		const page = await browser.newPage();
+		console.timeEnd("Puppeteer init");
 
-	console.time("Find banner");
-	const allPhrases = [...new Set(commonPhrases.flatMap((phrases) => phrases.phrases))];
-	const xpathExpression = allPhrases.map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
-	const elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
-	const cookieBannerElements: ElementHandle<Element>[] = [];
+		console.time("Request");
+		await page.goto(url, { waitUntil: "networkidle0" });
+		console.timeEnd("Request");
 
-	// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.
-	for (let i = 0; i < elementsWithKeyWords.length; i++) {
-		if (await elementsWithKeyWords[i].isIntersectingViewport()) {
-			console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
-			cookieBannerElements.push(elementsWithKeyWords[i]);
+		console.time("Find banner");
+		const allPhrases = [...new Set(commonPhrases.flatMap((phrases) => phrases.phrases))];
+		const xpathExpression = allPhrases.map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
+		const elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
+		const cookieBannerElements: ElementHandle<Element>[] = [];
+
+		// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.
+		for (let i = 0; i < elementsWithKeyWords.length; i++) {
+			if (await elementsWithKeyWords[i].isIntersectingViewport()) {
+				console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
+				cookieBannerElements.push(elementsWithKeyWords[i]);
+			}
 		}
+
+		console.log(`Found ${cookieBannerElements.length} elements`);
+		const cookieBanner = await findMostCommonAncestorWithBackgroundColor(cookieBannerElements);
+		if (!cookieBanner) {
+			return new Response("Cookie banner not found", { status: 400 }); // Temporary
+		}
+
+		console.log(`Found cookie banner in ${url}:`);
+		const screenshot = (await cookieBanner.screenshot({ encoding: "base64" })) as string;
+		console.timeEnd("Find banner");
+
+		await page.close();
+
+		const result = new AnalysisResult(screenshot);
+		results.push(result);
 	}
 
-	console.log(`Found ${cookieBannerElements.length} elements`);
-	const cookieBanner = await findMostCommonAncestorWithBackgroundColor(cookieBannerElements);
-	if (!cookieBanner) {
-		return new Response("Cookie banner not found", { status: 400 }); // Temporary
-	}
-
-	console.log(`Found cookie banner in ${url}:`);
-	const screenshot = (await cookieBanner.screenshot({ encoding: "base64" })) as string;
-	console.timeEnd("Find banner");
-
-	await page.close();
 	console.timeEnd("Function total");
-
-	const result = new AnalysisResult(screenshot);
-	return new Response(JSON.stringify(result));
+	return new Response(JSON.stringify(results));
 }
 
 /**

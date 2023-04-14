@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type AnalysisResult from "$lib/AnalysisResult";
 
-	let result: AnalysisResult | undefined;
+	let results: AnalysisResult[] = [];
 	let isLoading = false;
 	let url = "";
 
@@ -9,14 +9,14 @@
 		if (isLoading) return;
 
 		isLoading = true;
-		result = undefined;
+		results = [];
 
 		const urlSearchParams = new URLSearchParams({ url });
 		const response = await fetch(`/api/analysis?${urlSearchParams}`, {
 			method: "GET",
 		});
 
-		result = (await response.json()) as AnalysisResult;
+		results = (await response.json()) as AnalysisResult[];
 		isLoading = false;
 	}
 </script>
@@ -37,9 +37,11 @@
 		</div>
 	</form>
 
-	{#if result}
+	{#if results.length > 0}
 		<h2>Results</h2>
-		<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
+		{#each results as result}
+			<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
+		{/each}
 	{:else if isLoading}
 		<h2>Loading...</h2>
 	{/if}
