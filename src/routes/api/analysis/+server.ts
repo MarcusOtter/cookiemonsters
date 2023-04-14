@@ -1,4 +1,4 @@
-import { getBrowsers } from "$lib/server/getBrowser";
+import { getBrowsers } from "$lib/server/getBrowsers";
 import type { ElementHandle } from "puppeteer";
 import type { RequestHandler } from "./$types";
 import AnalysisResult from "$lib/AnalysisResult";
@@ -52,10 +52,19 @@ async function puppeteerAnalysis(url: string) {
 			}
 		}
 
+		const browserResolution = `${page.viewport()?.width}x${page.viewport()?.height}`;
+
 		console.log(`Found ${cookieBannerElements.length} elements`);
 		const cookieBanner = await findMostCommonAncestorWithBackgroundColor(cookieBannerElements);
 		if (!cookieBanner) {
-			return new Response("Cookie banner not found", { status: 400 }); // Temporary
+			const screenshot = (await page.screenshot({ encoding: "base64" })) as string;
+			const result = new AnalysisResult(browserResolution, screenshot, false);
+			results.push(result);
+			console.timeEnd("Find banner");
+
+			await page.close();
+
+			continue;
 		}
 
 		console.log(`Found cookie banner in ${url}:`);
@@ -63,8 +72,7 @@ async function puppeteerAnalysis(url: string) {
 		console.timeEnd("Find banner");
 
 		await page.close();
-
-		const result = new AnalysisResult(screenshot);
+		const result = new AnalysisResult(browserResolution, screenshot, true);
 		results.push(result);
 	}
 

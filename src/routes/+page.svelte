@@ -17,7 +17,7 @@
 <form on:submit|preventDefault={goToAnalysis}>
 	<label for="url">Web address</label>
 	<div class="inputs">
-		<input id="url" bind:value={url} placeholder="https://example.com" required />
+		<input id="url" bind:value={url} placeholder="https://example.com" required size="4" />
 		<button>Analyze</button>
 	</div>
 </form>

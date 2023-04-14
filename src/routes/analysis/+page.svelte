@@ -44,9 +44,11 @@
 	}
 </script>
 
+<h1>Analysis of {targetUrl}</h1>
 {#if results.length > 0}
-	<h2>Analysis</h2>
 	{#each results as result}
+		<h2>Screenshot {result.resolution}</h2>
+		<p>Found banner: {result.foundBanner ? "✅ Yes" : "❌ No"}</p>
 		<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
 	{/each}
 {:else if isLoading}
@@ -57,6 +59,10 @@
 {/if}
 
 <style>
+	h1 {
+		margin-block-start: 32px;
+	}
+
 	h2 {
 		margin-block-start: 48px;
 	}
