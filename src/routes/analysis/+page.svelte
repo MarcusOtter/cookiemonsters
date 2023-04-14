@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import type AnalysisResult from "$lib/AnalysisResult";
+	import getErrorMessage from "$lib/getErrorMessage";
 
 	let results: AnalysisResult[] = [];
 	let isLoading = false;
 	let targetUrl = "";
 	let errorMessage = "";
+	let selectedResultIndex = 0;
 
 	// If url is missing for some reason (like manually visiting /analysis) we redirect to / (using SvelteKit)
 	onMount(async () => {
@@ -17,7 +19,11 @@
 			return;
 		}
 
-		await analyze();
+		try {
+			await analyze();
+		} catch (e) {
+			errorMessage = getErrorMessage(e);
+		}
 	});
 
 	async function analyze() {
@@ -26,36 +32,41 @@
 		isLoading = true;
 		results = [];
 
-		try {
-			const response = await fetch(`/api/analysis?` + new URLSearchParams({ url: targetUrl }), {
-				method: "GET",
-			});
-
-			results = (await response.json()) as AnalysisResult[];
-		} catch (e) {
-			if (typeof e === "string") {
-				errorMessage = e;
-			} else if (e instanceof Error) {
-				errorMessage = e.message;
-			}
+		const apiUrl = `/api/analysis?` + new URLSearchParams({ url: targetUrl });
+		const response = await fetch(apiUrl, { method: "GET" });
+		if (!response.ok) {
+			errorMessage = await response.text();
+			isLoading = false;
+			return;
 		}
 
+		results = (await response.json()) as AnalysisResult[];
 		isLoading = false;
 	}
 </script>
 
+<a href="/">Back to home</a>
+
 <h1>Analysis of {targetUrl}</h1>
+
 {#if results.length > 0}
-	{#each results as result}
-		<h2>Screenshot {result.resolution}</h2>
-		<p>Found banner: {result.foundBanner ? "✅ Yes" : "❌ No"}</p>
-		<img src="data:image/png;base64,{result.screenshotBase64}" alt="Screenshot" />
+	<select on:change={(e) => (selectedResultIndex = parseInt(e.currentTarget.value))}>
+		{#each results as result, index}
+			<option value={index} selected={index === selectedResultIndex}>{result.name}</option>
+		{/each}
+	</select>
+	{#each results[selectedResultIndex].viewports as viewport}
+		<h2>Screenshot {viewport.resolution}</h2>
+		<p>Found banner: {viewport.foundBanner ? "✅ Yes" : "❌ No"}</p>
+		<p>Time taken: {viewport.findDurationMs.toFixed(0)}ms</p>
+		<img src="data:image/png;base64,{viewport.screenshotBase64}" alt="Screenshot" />
 	{/each}
 {:else if isLoading}
 	<h2>Loading...</h2>
 {:else if errorMessage.length > 0}
 	<h2>Error</h2>
 	<p>{errorMessage}</p>
+	<a href="/analysis?url={targetUrl}">Try again</a>
 {/if}
 
 <style>
@@ -65,5 +76,9 @@
 
 	h2 {
 		margin-block-start: 48px;
+	}
+
+	select {
+		margin-block-start: 16px;
 	}
 </style>
