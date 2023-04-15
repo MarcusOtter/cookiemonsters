@@ -2,6 +2,7 @@ import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
 import ViewportFindResult from "$lib/ViewportFindResult";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
+import { getElementOpeningTag, getViewportSize } from "../puppeteerHelpers";
 
 export default class OliverBannerFinder implements BannerFinder {
 	/** @inheritdoc */
@@ -15,24 +16,22 @@ export default class OliverBannerFinder implements BannerFinder {
 		// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.
 		for (let i = 0; i < elementsWithKeyWords.length; i++) {
 			if (await elementsWithKeyWords[i].isIntersectingViewport()) {
-				console.log(await this.getElementOpeningTag(elementsWithKeyWords[i]));
+				console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
 				cookieBannerElements.push(elementsWithKeyWords[i]);
 			}
 		}
-
-		const browserResolution = `${page.viewport()?.width}x${page.viewport()?.height}`;
 
 		console.log(`Found ${cookieBannerElements.length} elements`);
 		const cookieBanner = await this.findMostCommonAncestorWithBackgroundColor(cookieBannerElements);
 		if (!cookieBanner) {
 			const screenshot = (await page.screenshot({ encoding: "base64" })) as string;
-			return new ViewportFindResult(false, browserResolution, screenshot, performance.now() - startTime);
+			return new ViewportFindResult(false, getViewportSize(page), screenshot, performance.now() - startTime);
 		}
 
 		console.log(`Found cookie banner in ${page.url()}:`);
 		const screenshot = (await cookieBanner.screenshot({ encoding: "base64" })) as string;
 
-		return new ViewportFindResult(true, browserResolution, screenshot, performance.now() - startTime);
+		return new ViewportFindResult(true, getViewportSize(page), screenshot, performance.now() - startTime);
 	}
 
 	/**
@@ -49,7 +48,7 @@ export default class OliverBannerFinder implements BannerFinder {
 		for (const element of elements) {
 			const ancestor = await this.findAncestorWithBackgroundColor(element);
 			if (ancestor !== null) {
-				const objectId = await this.getElementOpeningTag(ancestor);
+				const objectId = await getElementOpeningTag(ancestor);
 				const counterEntry = ancestorCounter.get(objectId);
 				if (counterEntry) {
 					counterEntry.count += 1;
@@ -110,22 +109,5 @@ export default class OliverBannerFinder implements BannerFinder {
 		}
 
 		return !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
-	}
-
-	/**
-	 * Retrieves the opening tag of an element, including its tag name and attributes.
-	 * The function returns a string representation of the opening tag, e.g., \<div id="example" class="test">.
-	 *
-	 * @param {ElementHandle} element - ElementHandle to get the opening tag for
-	 * @returns {Promise<string>} Resolves to the opening tag of the element as a string
-	 */
-	async getElementOpeningTag(element: ElementHandle): Promise<string> {
-		return await element.evaluate((el) => {
-			const openingTag = `<${el.tagName.toLowerCase()}${[...el.attributes]
-				.map((attr) => ` ${attr.name}="${attr.value}"`)
-				.join("")}>`;
-
-			return openingTag;
-		});
 	}
 }

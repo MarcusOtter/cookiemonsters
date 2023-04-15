@@ -4,7 +4,9 @@ import puppeteer from "puppeteer";
 let browser: Browser;
 
 export async function getDesktopPage(): Promise<Page> {
-	return getPage({ width: 1920, height: 1080 });
+	const userAgent =
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36";
+	return getPage({ width: 1920, height: 1080 }, userAgent);
 }
 
 // https://www.browserstack.com/guide/ideal-screen-sizes-for-responsive-design
@@ -14,7 +16,7 @@ export async function getMobilePage(): Promise<Page> {
 	return getPage({ width: 360, height: 640 }, userAgent);
 }
 
-async function getPage(viewport: { width: number; height: number }, userAgent = ""): Promise<Page> {
+async function getPage(viewport: { width: number; height: number }, userAgent: string): Promise<Page> {
 	const browser = await getBrowser();
 	const page = await browser.newPage();
 	await page.setViewport(viewport);
@@ -29,6 +31,6 @@ async function getBrowser(): Promise<Browser> {
 		return browser;
 	}
 
-	browser = await puppeteer.launch({ defaultViewport: { width: 1920, height: 1080 } });
+	browser = await puppeteer.launch();
 	return browser;
 }
