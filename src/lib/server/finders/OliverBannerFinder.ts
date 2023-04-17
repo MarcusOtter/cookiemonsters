@@ -10,13 +10,29 @@ export default class OliverBannerFinder implements BannerFinder {
 		const startTime = performance.now();
 		const commonPhrases = getUniqueCommonPhrases();
 		const xpathExpression = commonPhrases.map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
-		const elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
+		let elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
+
+		const iframes = (await page.$$("iframe")) as ElementHandle<Element>[];
+
+		for (let i = 0; i < iframes.length; i++) {
+			const frame = await iframes[i].contentFrame();
+			if (frame) {
+				const iframeElements = (await frame.$x(xpathExpression)) as ElementHandle<Element>[];
+
+				if (iframeElements instanceof Array) {
+					elementsWithKeyWords = elementsWithKeyWords.concat(iframeElements);
+				} else {
+					elementsWithKeyWords.push(iframeElements);
+				}
+			}
+		}
+
 		const cookieBannerElements: ElementHandle<Element>[] = [];
 
 		// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.
 		for (let i = 0; i < elementsWithKeyWords.length; i++) {
+			console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
 			if (await elementsWithKeyWords[i].isIntersectingViewport()) {
-				console.log(await getElementOpeningTag(elementsWithKeyWords[i]));
 				cookieBannerElements.push(elementsWithKeyWords[i]);
 			}
 		}
@@ -108,6 +124,13 @@ export default class OliverBannerFinder implements BannerFinder {
 			return false;
 		}
 
-		return !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
+		const hasBackgroundColor = !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
+		const hasBackground = !style.background.includes("rgba(0, 0, 0, 0)");
+
+		if (hasBackgroundColor || hasBackground) {
+			return true;
+		}
+
+		return false;
 	}
 }

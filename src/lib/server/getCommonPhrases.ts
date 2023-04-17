@@ -4,7 +4,10 @@ export function getCommonPhrases(): { language: string; phrases: string[] }[] {
 		{ language: "en", phrases: ["cookie", "Accept", "Decline"] },
 		{ language: "es", phrases: ["cookie", "Aceptar", "Rechazar"] },
 		{ language: "fr", phrases: ["cookie", "Accepter", "Refuser"] },
-		{ language: "sv", phrases: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera cookies", "kakor"] },
+		{
+			language: "sv",
+			phrases: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera cookies", "kakor", "samtyck", "personuppgift"],
+		},
 	];
 }
 
