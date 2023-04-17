@@ -5,4 +5,14 @@
 
 <TopBar />
 
-<slot />
+<main>
+	<slot />
+</main>
+
+<style>
+	main {
+		margin-inline: auto;
+		padding: 2ch;
+		max-width: 80ch;
+	}
+</style>

@@ -1,7 +1,13 @@
-export default class AnalysisResult {
-	public readonly screenshotBase64: string;
+import type ViewportFindResult from "./ViewportFindResult";
 
-	constructor(screenshotBase64: string) {
-		this.screenshotBase64 = screenshotBase64;
+export default class AnalysisResult {
+	public readonly name: string;
+	public readonly viewports: ViewportFindResult[];
+	public readonly requestDurationMs: number;
+
+	constructor(name: string, viewports: ViewportFindResult[], requestDurationMs: number) {
+		this.name = name;
+		this.viewports = viewports;
+		this.requestDurationMs = requestDurationMs;
 	}
 }
