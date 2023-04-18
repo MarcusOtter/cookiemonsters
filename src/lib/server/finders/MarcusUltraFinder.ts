@@ -1,0 +1,114 @@
+import ViewportFindResult from "$lib/ViewportFindResult";
+import type { ElementHandle, Page } from "puppeteer";
+import type BannerFinder from "./BannerFinder";
+import { getElementOpeningTag, getElementsWithWords, getViewportSize, screenshotAsBase64 } from "../puppeteerHelpers";
+import { getUniqueCommonPhrases } from "../getCommonPhrases";
+
+export default class MarcusUltraFinder implements BannerFinder {
+	async findBanner(page: Page): Promise<ViewportFindResult> {
+		const startTime = performance.now();
+
+		console.log("##### MARCUS ULTRA START #####");
+
+		/*
+			- Find all elements with at least one text match (in chilren or itself)
+			- Pick the element with the largest z-index
+				- If there is a tie, pick the element with a fully opaque background color
+			- Calculate keyword density for this element.
+			- If the element has a higher density than the body, it's likely a banner
+			- But it could be a wrapper, so we should keep descending down the children until the inner text length changes
+			- If the density changes, we've found the banner (before the change happened)
+		*/
+
+		// Find all elements with at least one text match (in chilren or itself)
+		const keywords = getUniqueCommonPhrases();
+		const elements = await getElementsWithWords(page, keywords, { includeChildren: true });
+
+		// Pick the element with the largest z-index
+		let bestElements: ElementHandle<HTMLElement>[] = [];
+		let highestZIndex = -Infinity;
+		for (const element of elements) {
+			const zIndex = await element.evaluate((el) => {
+				const zIndex = window.getComputedStyle(el).zIndex;
+				return zIndex === "auto" ? 0 : parseInt(zIndex);
+			});
+
+			if (zIndex == highestZIndex) {
+				bestElements.push(element);
+				continue;
+			}
+
+			if (zIndex > highestZIndex) {
+				highestZIndex = zIndex;
+				bestElements = [element];
+			}
+		}
+
+		console.log("Best elements length:", bestElements.length);
+
+		let bestElement = undefined;
+		// If there is a tie, pick the element with a fully opaque background color
+		if (bestElements.length === 1) {
+			bestElement = bestElements[0];
+		} else {
+			console.log("THERE WAS A TIE BETWEEN ", bestElements.length, " ELEMENTS");
+			for (const element of bestElements) {
+				const isOpaque = await element.evaluate((el) => {
+					const backgroundColor = window.getComputedStyle(el).getPropertyValue("background-color");
+					const backgroundImage = window.getComputedStyle(el).getPropertyValue("background-image");
+
+					const colorIsOpaque = !backgroundColor.startsWith("rgba") || backgroundColor.endsWith(", 1)");
+					const hasImage = backgroundImage !== "none";
+					return colorIsOpaque || hasImage;
+				});
+
+				if (isOpaque) {
+					bestElement = element;
+					break;
+				}
+			}
+		}
+
+		// It could be a wrapper, so we should keep descending down the children until the inner text length changes
+		if (bestElement) {
+			let currentElement = bestElement;
+			let currentInnerTextLength = await currentElement.evaluate((el) => el.innerText.length);
+			let nextElement = (await currentElement.$(
+				":scope > *:not(style):not(script):not(link):not(meta)",
+			)) as ElementHandle<HTMLElement>;
+
+			while (nextElement) {
+				const nextInnerTextLength = await nextElement.evaluate((el) => el.innerText.length);
+				// This logic is a bit flawed, check blocket.se for example
+				if (nextInnerTextLength !== currentInnerTextLength) {
+					console.log(
+						`Text length between ${await getElementOpeningTag(currentElement)} and ${await getElementOpeningTag(
+							nextElement,
+						)} changed from ${currentInnerTextLength} to ${nextInnerTextLength}`,
+					);
+					break;
+				}
+
+				currentElement = nextElement;
+				currentInnerTextLength = nextInnerTextLength;
+				nextElement = (await currentElement.$(
+					":scope > *:not(style):not(script):not(link):not(meta)",
+				)) as ElementHandle<HTMLElement>;
+
+				bestElement = currentElement;
+			}
+		}
+
+		if (bestElement) {
+			console.log("The best element is", await getElementOpeningTag(bestElement));
+		}
+
+		const screenshot = await screenshotAsBase64(bestElement ?? page);
+		return new ViewportFindResult(
+			bestElement != undefined,
+			getViewportSize(page),
+			screenshot,
+			performance.now() - startTime,
+		);
+	}
+}

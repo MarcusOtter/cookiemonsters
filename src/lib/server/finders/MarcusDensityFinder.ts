@@ -4,7 +4,7 @@ import type BannerFinder from "./BannerFinder";
 import { getElementOpeningTag, getViewportSize, screenshotAsBase64 } from "../puppeteerHelpers";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
 
-export default class MarcusScoreFinder implements BannerFinder {
+export default class MarcusDensityFinder implements BannerFinder {
 	/** @inheritdoc */
 	async findBanner(page: Page): Promise<ViewportFindResult> {
 		const startTime = performance.now();

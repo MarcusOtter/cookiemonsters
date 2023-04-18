@@ -8,6 +8,19 @@ export async function getAllChildren(element: ElementHandle<Element> | null) {
 	return element ? await element.$$(":scope *") : [];
 }
 
+// TODO: Include iframe elements
+export async function getElementsWithWords(page: Page, words: string[], options?: { includeChildren: boolean }) {
+	const xpathExpression = words
+		.map(
+			(word) =>
+				`//*[contains(translate(string(${
+					options?.includeChildren ? "descendant-or-self" : "self"
+				}::*), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ', 'abcdefghijklmnopqrstuvwxyzåäö'), '${word.toLowerCase()}')]`,
+		)
+		.join(" | ");
+	return (await page.$x(xpathExpression)) as ElementHandle<HTMLElement>[];
+}
+
 export async function screenshotAsBase64(source: ElementHandle<Element> | Page | null): Promise<string> {
 	if (!source) return "";
 	return (await (source as ElementHandle<Element>).screenshot({ encoding: "base64" })) as string;
