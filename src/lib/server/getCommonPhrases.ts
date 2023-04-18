@@ -6,11 +6,11 @@ export function getCommonPhrases(): { language: string; phrases: string[] }[] {
 		{ language: "fr", phrases: ["cookie", "Accepter", "Refuser"] },
 		{
 			language: "sv",
-			phrases: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera cookies", "kakor", "samtyck", "personuppgift"],
+			phrases: ["cookie", "Godkänn", "Avvisa", "Neka", "Hantera", "kakor", "samtyck", "personuppgift"],
 		},
 	];
 }
 
 export function getUniqueCommonPhrases(): string[] {
-	return [...new Set(getCommonPhrases().flatMap((phrases) => phrases.phrases))];
+	return [...new Set(getCommonPhrases().flatMap((full) => full.phrases))];
 }

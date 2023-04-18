@@ -8,7 +8,8 @@ export async function getAllChildren(element: ElementHandle<Element> | null) {
 	return element ? await element.$$(":scope *") : [];
 }
 
-export async function screenshotAsBase64(source: ElementHandle<Element> | Page): Promise<string> {
+export async function screenshotAsBase64(source: ElementHandle<Element> | Page | null): Promise<string> {
+	if (!source) return "";
 	return (await (source as ElementHandle<Element>).screenshot({ encoding: "base64" })) as string;
 }
 
