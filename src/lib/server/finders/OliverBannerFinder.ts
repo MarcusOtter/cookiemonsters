@@ -2,31 +2,14 @@ import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
 import ViewportFindResult from "$lib/ViewportFindResult";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
-import { getElementOpeningTag, getViewportSize } from "../puppeteerHelpers";
+import { getElementOpeningTag, getElementsWithWords, getViewportSize } from "../puppeteerHelpers";
 
 export default class OliverBannerFinder implements BannerFinder {
 	/** @inheritdoc */
 	async findBanner(page: Page): Promise<ViewportFindResult> {
 		const startTime = performance.now();
 		const commonPhrases = getUniqueCommonPhrases();
-		const xpathExpression = commonPhrases.map((phrase) => `//*[contains(text(), '${phrase}')]`).join(" | ");
-		let elementsWithKeyWords = (await page.$x(xpathExpression)) as ElementHandle<Element>[];
-
-		const iframes = (await page.$$("iframe")) as ElementHandle<Element>[];
-
-		for (let i = 0; i < iframes.length; i++) {
-			const frame = await iframes[i].contentFrame();
-			if (frame) {
-				const iframeElements = (await frame.$x(xpathExpression)) as ElementHandle<Element>[];
-
-				if (iframeElements instanceof Array) {
-					elementsWithKeyWords = elementsWithKeyWords.concat(iframeElements);
-				} else {
-					elementsWithKeyWords.push(iframeElements);
-				}
-			}
-		}
-
+		const elementsWithKeyWords = await getElementsWithWords(page, commonPhrases);
 		const cookieBannerElements: ElementHandle<Element>[] = [];
 
 		// Checks if the element is visible in the current viewport. This is to exclude for example hidden cookie settings from the initial banner detection.

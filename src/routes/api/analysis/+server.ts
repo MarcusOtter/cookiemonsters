@@ -40,6 +40,9 @@ async function getResults(url: string): Promise<AnalysisResult[]> {
 	await mobilePage.goto(url, { waitUntil: "networkidle0" });
 	const requestTimeMs = performance.now() - requestTimeStart;
 
+	// Add 5s delay for debugging purposes
+	// await new Promise((r) => setTimeout(r, 5000));
+
 	for (const finder of getBannerFinders()) {
 		const desktopResult = await finder.findBanner(desktopPage);
 		const mobileResult = await finder.findBanner(mobilePage);
