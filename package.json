@@ -30,6 +30,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"csv": "^6.2.10",
 		"puppeteer": "^18.1.0"
 	}
 }
