@@ -3,6 +3,7 @@ import { getDesktopPage, getMobilePage } from "$lib/server/getPage";
 import AnalysisResult from "$lib/AnalysisResult";
 import getBannerFinders from "$lib/server/finders/getBannerFinders";
 import getErrorMessage from "$lib/getErrorMessage";
+import Db from "$lib/server/db/Db";
 
 export const GET = (async (request) => {
 	let url = request.url.searchParams.get("url");
@@ -16,7 +17,20 @@ export const GET = (async (request) => {
 	}
 
 	try {
+		const database = new Db();
+		await database.init();
+
+		const selector = await database.getSelector(url, "");
+		if (selector) {
+			console.log("ALREADY HAD SELECTOR ", selector.selector);
+		}
+
 		const results = await getResults(url);
+		if (!selector) {
+			console.log("INSERTING SELECTOR");
+			await database.insertSelector(url, "", "imaginary selector");
+		}
+
 		return new Response(JSON.stringify(results));
 	} catch (e) {
 		return new Response(getErrorMessage(e), { status: 500 });
