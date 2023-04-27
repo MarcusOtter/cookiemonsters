@@ -5,7 +5,6 @@ import {
 	getElementOpeningTag,
 	getElementsWithWords,
 	getUniqueCssSelector,
-	getUniqueCssSelectorBad,
 	getViewportSize,
 	screenshotAsBase64,
 } from "../puppeteerHelpers";
@@ -60,7 +59,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 		console.log("Best elements length:", bestElements.length);
 
 		let bestElement = undefined;
-		// If there is a tie, pick the element with a fully opaque background color
+		// If there is a tie, pick the element with a fully opaque background color (broken for youtube.com on mobile)
 		if (bestElements.length === 1) {
 			bestElement = bestElements[0];
 		} else {
@@ -177,10 +176,6 @@ export default class MarcusUltraFinder implements BannerFinder {
 
 		const screenshot = await screenshotAsBase64(bestElement ?? page);
 		const selector = bestElement ? await getUniqueCssSelector(bestElement as ElementHandle<HTMLElement>, page) : "";
-		const selector2 = bestElement ? await getUniqueCssSelectorBad(bestElement as ElementHandle<HTMLElement>, page) : "";
-		console.log("Selectors were equal:", selector === selector2);
-		console.log("Selector:", selector);
-		console.log("Selector2:", selector2);
 
 		return new ViewportFindResult(
 			bestElement != undefined,

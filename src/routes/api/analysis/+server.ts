@@ -31,6 +31,7 @@ export const GET = (async (request) => {
 
 		const results = await getResults(url);
 		if (!selector) {
+			// TODO: Make sure the selector is not empty first :) And obviously clean this mess up!
 			console.log("INSERTING SELECTOR ", results[0].viewports[0].bannerCssSelctor);
 			await database.insertSelector(url, "", results[0].viewports[0].bannerCssSelctor);
 		}
@@ -58,8 +59,11 @@ async function getResults(url: string): Promise<AnalysisResult[]> {
 	await mobilePage.goto(url, { waitUntil: "networkidle0" });
 	const requestTimeMs = performance.now() - requestTimeStart;
 
-	// Add 10s delay for debugging purposes
-	// await new Promise((r) => setTimeout(r, 10000));
+	// Add delay for debugging purposes
+	// This is hardcoded now, but Oliver had a great idea:
+	// we should probably retry once after a delay of 5-10s if the immediate scan did not find anything.
+	// But we should only to this if the DOM has changed when waiting.
+	await new Promise((r) => setTimeout(r, 5000));
 
 	for (const finder of getBannerFinders()) {
 		const desktopResult = await finder.findBanner(desktopPage);
