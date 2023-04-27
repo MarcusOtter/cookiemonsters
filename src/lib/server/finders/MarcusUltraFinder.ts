@@ -1,9 +1,17 @@
 import ViewportFindResult from "$lib/ViewportFindResult";
 import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
-import { getElementOpeningTag, getElementsWithWords, getViewportSize, screenshotAsBase64 } from "../puppeteerHelpers";
+import {
+	getElementOpeningTag,
+	getElementsWithWords,
+	getUniqueCssSelector,
+	getUniqueCssSelectorBad,
+	getViewportSize,
+	screenshotAsBase64,
+} from "../puppeteerHelpers";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
 
+// TODO: Needs a big refactor.
 export default class MarcusUltraFinder implements BannerFinder {
 	async findBanner(page: Page): Promise<ViewportFindResult> {
 		const startTime = performance.now();
@@ -26,7 +34,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 		const elements = await getElementsWithWords(page, keywords, { includeChildren: true });
 
 		// Pick the element with the largest z-index
-		let bestElements: ElementHandle<HTMLElement>[] = [];
+		let bestElements: ElementHandle<Element>[] = [];
 		let highestZIndex = -Infinity;
 		for (const element of elements) {
 			const zIndex = await element.evaluate((el) => {
@@ -75,9 +83,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 			}
 		}
 
-		async function searchForOpaqueElement(
-			element: ElementHandle<HTMLElement>,
-		): Promise<ElementHandle<HTMLElement> | null> {
+		async function searchForOpaqueElement(element: ElementHandle<Element>): Promise<ElementHandle<Element> | null> {
 			const currentIsOpaque = await element.evaluate((el) => {
 				const backgroundColor = window.getComputedStyle(el).getPropertyValue("background-color");
 				const backgroundImage = window.getComputedStyle(el).getPropertyValue("background-image");
@@ -170,11 +176,18 @@ export default class MarcusUltraFinder implements BannerFinder {
 		}
 
 		const screenshot = await screenshotAsBase64(bestElement ?? page);
+		const selector = bestElement ? await getUniqueCssSelector(bestElement as ElementHandle<HTMLElement>, page) : "";
+		const selector2 = bestElement ? await getUniqueCssSelectorBad(bestElement as ElementHandle<HTMLElement>, page) : "";
+		console.log("Selectors were equal:", selector === selector2);
+		console.log("Selector:", selector);
+		console.log("Selector2:", selector2);
+
 		return new ViewportFindResult(
 			bestElement != undefined,
 			getViewportSize(page),
 			screenshot,
 			performance.now() - startTime,
+			selector,
 		);
 	}
 }

@@ -11,7 +11,7 @@ export const GET = (async (request) => {
 		return new Response("No URL provided", { status: 400 });
 	}
 
-	// TODO: If this fails we should also try HTTP maybe
+	// TODO: If this fails we should also try HTTP maybe. We should do all of this with an URL object.
 	if (!url.startsWith("http")) {
 		url = `https://${url}`;
 	}
@@ -20,6 +20,10 @@ export const GET = (async (request) => {
 		const database = new Db();
 		await database.init();
 
+		// TODO: If we didn't find a selector based on full URL, we should try the hostname (subdomain + domain + TLD)
+		// If we at any point find a selector, we need to try to find the element. If we can not find the element, go next.
+		// If we find the element, screenshot it and compare it to the checksum we have in the DB.
+		// If those checks passed, we don't need to find the cookie banner with a BannerFinder again
 		const selector = await database.getSelector(url, "");
 		if (selector) {
 			console.log("ALREADY HAD SELECTOR ", selector.selector);
@@ -27,8 +31,8 @@ export const GET = (async (request) => {
 
 		const results = await getResults(url);
 		if (!selector) {
-			console.log("INSERTING SELECTOR");
-			await database.insertSelector(url, "", "imaginary selector");
+			console.log("INSERTING SELECTOR ", results[0].viewports[0].bannerCssSelctor);
+			await database.insertSelector(url, "", results[0].viewports[0].bannerCssSelctor);
 		}
 
 		return new Response(JSON.stringify(results));
@@ -54,8 +58,8 @@ async function getResults(url: string): Promise<AnalysisResult[]> {
 	await mobilePage.goto(url, { waitUntil: "networkidle0" });
 	const requestTimeMs = performance.now() - requestTimeStart;
 
-	// Add 5s delay for debugging purposes
-	// await new Promise((r) => setTimeout(r, 5000));
+	// Add 10s delay for debugging purposes
+	// await new Promise((r) => setTimeout(r, 10000));
 
 	for (const finder of getBannerFinders()) {
 		const desktopResult = await finder.findBanner(desktopPage);
