@@ -32,77 +32,35 @@ export async function getElementsWithWords(page: Page, words: string[], options?
 	return elementsWithKeyWords;
 }
 
-export async function getUniqueCssSelectorBad(element: ElementHandle<HTMLElement>, page: Page): Promise<string> {
-	console.time("getUniqueCssSelector BAD");
-
-	async function testSelector(selector: string): Promise<boolean> {
-		const matchedElements = await page.$$(selector);
-		return matchedElements.length === 1;
-	}
-
-	async function buildSelector(node: ElementHandle<HTMLElement>): Promise<string> {
-		const selector = await node.evaluate((n) => n.tagName.toLowerCase());
-		const nodeId = await node.evaluate((n) => n.id);
-		if (nodeId) {
-			const idSelector = `${selector}#${nodeId}`;
-			if (await testSelector(idSelector)) {
-				return idSelector;
-			}
-		}
-
-		const nodeClassList = await node.evaluate((n) => Array.from(n.classList));
-		if (nodeClassList.length > 0) {
-			const classSelector = `${selector}.${nodeClassList.join(".")}`;
-			if (await testSelector(classSelector)) {
-				return classSelector;
-			}
-		}
-
-		if (!(await node.evaluate((n) => n.parentElement))) {
-			return "";
-		}
-		const parentNode = (await node.$$("xpath/" + ".."))[0] as ElementHandle<HTMLElement>;
-		const parentSelector = await buildSelector(parentNode);
-		if (parentSelector) {
-			const combinedSelector = `${parentSelector} > ${selector}`;
-			if (await testSelector(combinedSelector)) {
-				return combinedSelector;
-			}
-		}
-
-		return selector;
-	}
-
-	const result = await buildSelector(element);
-	console.timeEnd("getUniqueCssSelector BAD");
-	return result;
-}
-
+/**
+ * Find a unique selector for a given element, with a focus on being as stable as possible.
+ * This means that we prioritize including near parents as to not be affected by changes in the DOM.
+ * For the same reason, we do not use pseudo selectors like :nth-child() or :nth-of-type().
+ * As soon as the method finds a selector that is unique, it will stop searching.
+ * @param element the element you want a selector for
+ * @param page the page the element is on
+ * @returns a unique CSS selector for the element. If it could not find one, it will return an empty string.
+ */
 export async function getUniqueCssSelector(element: ElementHandle<HTMLElement>, page: Page): Promise<string> {
-	console.time("getUniqueCssSelector GOOD");
 	const result = await page.evaluate((el: HTMLElement) => {
-		function testSelector(selector: string): boolean {
+		function isUniqueSelector(selector: string): boolean {
 			const matchedElements = document.querySelectorAll(selector);
-			console.log(`Testing selector ${selector} with ${matchedElements.length} matches`);
 			return matchedElements.length === 1 && matchedElements[0] === el;
 		}
 
 		function buildSelector(node: HTMLElement): string {
-			// if (!node.parentElement) {
-			// 	return "";
-			// }
 			const selector = node.tagName.toLowerCase();
 
 			if (node.id) {
-				const idSelector = `${selector}#${node.id}`;
-				if (testSelector(idSelector)) {
+				const idSelector = `${selector}#${CSS.escape(node.id)}`;
+				if (isUniqueSelector(idSelector)) {
 					return idSelector;
 				}
 			}
 
 			if (node.classList.length > 0) {
-				const classSelector = `${selector}.${[...node.classList].join(".")}`;
-				if (testSelector(classSelector)) {
+				const classSelector = `${selector}.${[...node.classList].map((c) => CSS.escape(c)).join(".")}`;
+				if (isUniqueSelector(classSelector)) {
 					return classSelector;
 				}
 			}
@@ -111,7 +69,7 @@ export async function getUniqueCssSelector(element: ElementHandle<HTMLElement>, 
 				const parentSelector = buildSelector(node.parentElement);
 				if (parentSelector) {
 					const combinedSelector = `${parentSelector} > ${selector}`;
-					if (testSelector(combinedSelector)) {
+					if (isUniqueSelector(combinedSelector)) {
 						return combinedSelector;
 					}
 				}
@@ -120,10 +78,10 @@ export async function getUniqueCssSelector(element: ElementHandle<HTMLElement>, 
 			return selector;
 		}
 
-		return buildSelector(el);
+		const result = buildSelector(el);
+		return isUniqueSelector(result) ? result : "";
 	}, element);
 
-	console.timeEnd("getUniqueCssSelector GOOD");
 	return result;
 }
 
