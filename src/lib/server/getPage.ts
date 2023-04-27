@@ -31,6 +31,17 @@ async function getBrowser(): Promise<Browser> {
 		return browser;
 	}
 
-	browser = await puppeteer.launch();
+	browser = await puppeteer.launch({
+		headless: true,
+
+		// These args be needed to not get blocked by CORS on some sites
+		// However, I'm not sure what the security implications are since we are
+		// letting users visit arbitrary websites on our server
+		// args: [
+		// 	"--disable-web-security",
+		// 	"--disable-features=IsolateOrigins",
+		// 	"--disable-site-isolation-trials",
+		// ],
+	});
 	return browser;
 }

@@ -22,6 +22,7 @@ export default class Db {
 		await this.createTables(Db.connection);
 	}
 
+	// TODO: Do not take the screenshot here, just take full url
 	public async getSelector(fullUrl: string, screenshotBase64: string) {
 		const baseUrl = getBaseUrl(fullUrl);
 		const checksum = this.getChecksum(baseUrl, screenshotBase64);
