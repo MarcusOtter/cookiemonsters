@@ -12,8 +12,6 @@ import getBannerFinders from "$lib/server/finders/getBannerFinders";
 import BannerSelector from "$lib/server/db/BannerSelector";
 
 export const GET = (async (request): Promise<Response> => {
-	const startTime = performance.now();
-
 	let urlString = request.url.searchParams.get("url") ?? "";
 	if (!urlString.startsWith("http")) {
 		urlString = `https://${urlString}`;
@@ -58,6 +56,8 @@ export const GET = (async (request): Promise<Response> => {
 			const results = [];
 
 			for (const finder of getBannerFinders()) {
+				const startTime = performance.now();
+
 				const newSelector = await finder.findBannerSelector(desktopPage);
 				const desktopScreenshot = await getScreenshot(newSelector, desktopPage);
 				const mobileScreenshot = await getScreenshot(newSelector, mobilePage);
@@ -93,19 +93,9 @@ export const GET = (async (request): Promise<Response> => {
 		}
 
 		const mobileScreenshot = await getScreenshot(selector.text, mobilePage);
-		const desktopResult = new DeviceResult(
-			getViewportSize(desktopPage),
-			desktopScreenshot,
-			performance.now() - startTime,
-			selector.text,
-		);
+		const desktopResult = new DeviceResult(getViewportSize(desktopPage), desktopScreenshot, 0, selector.text);
 
-		const mobileResult = new DeviceResult(
-			getViewportSize(mobilePage),
-			mobileScreenshot,
-			performance.now() - startTime,
-			selector.text,
-		);
+		const mobileResult = new DeviceResult(getViewportSize(mobilePage), mobileScreenshot, 0, selector.text);
 
 		return json([new BannerFindResponse("cached", [desktopResult, mobileResult])]);
 	} catch (e) {
