@@ -8,7 +8,6 @@ INSERT INTO "Cookie" ("id",
                       "controller",
                       "privacyLink",
                       "wildcardMatch")
-
 VALUES ("256c0fe2-d881-11e9-8a34-2a2ae2dbcce4", "Google Tag Manager", "Functional", "cookiePreferences", "Advertiser's website domain (1st party)", "Registers cookie preferences of a user", "2 years", "Google", "https://privacy.google.com/take-control.html", 0),
        ("256c12b2-d881-11e9-8a34-2a2ae2dbcce4", "Cookiebot", "Functional", "CookieConsent", "cookiebot.com (3rd party) or advertiser's website domain (1st party)", "Registers cookie preferences of a user", "1 year", "Cookiebot", "https://www.cookiebot.com/en/cookie-declaration/", 1),
        ("256c1410-d881-11e9-8a34-2a2ae2dbcce4", "Cookiebot", "Functional", "CookieConsentBulkTicket", "cookiebot.com (3rd party)", "Enables sharing cookie preferences across domains / websites", "1 year", "Cookiebot", "https://www.cookiebot.com/en/cookie-declaration/", 0),

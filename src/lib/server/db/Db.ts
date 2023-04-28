@@ -1,16 +1,12 @@
 import sqlite3 from "sqlite3";
 import { Database, open } from "sqlite";
-import crypto from "crypto";
 import type BannerSelector from "./BannerSelector";
-import getBaseUrl from "../utils/getBaseUrl";
 
 import insert_cookies from "./sql/insert_cookies.sql?raw";
 import create_tables from "./sql/create_tables.sql?raw";
 
-type DbConnection = Database<sqlite3.Database, sqlite3.Statement>;
-
 export default class Db {
-	private static connection: DbConnection;
+	private static connection: Database<sqlite3.Database, sqlite3.Statement>;
 
 	// Do not forget to invoke this method as soon as Db is created
 	public async init() {
@@ -24,47 +20,34 @@ export default class Db {
 		});
 
 		console.log("Database connection opened.");
-
 		await this.createTables();
 	}
 
-	// TODO: Do not take the screenshot here, just take full url
-	public async getSelector(fullUrl: string, screenshotBase64: string) {
-		const baseUrl = getBaseUrl(fullUrl);
-		const checksum = this.getChecksum(baseUrl, screenshotBase64);
-		const result = await Db.connection.get<BannerSelector>(
-			`SELECT * FROM "BannerSelector" WHERE "checksum" = ?`,
-			checksum,
+	public async getSelector(options: { fullUrl?: string; hostname?: string }) {
+		return await Db.connection.get<BannerSelector>(
+			`SELECT * FROM "BannerSelector"
+			WHERE ${options.fullUrl ? "url" : "hostname"} = ?
+			ORDER BY createdAtUtc DESC
+			LIMIT 1`,
+			options.fullUrl ? options.fullUrl : options.hostname,
 		);
-
-		return result;
 	}
 
-	public async insertSelector(fullUrl: string, screenshotBase64: string, selector: string) {
-		const baseUrl = getBaseUrl(fullUrl);
-		const checksum = this.getChecksum(baseUrl, screenshotBase64);
-		const result = await Db.connection?.run(
-			`INSERT INTO "BannerSelector" ("url", "createdAtUtc", "checksum", "selector") VALUES (?, ?, ?, ?)`,
-			fullUrl,
-			new Date().toISOString(),
-			checksum,
-			selector,
+	public async addSelector(selector: BannerSelector) {
+		await Db.connection?.run(
+			`
+			INSERT INTO BannerSelector (url, hostname, createdAtUtc, checksum, text) VALUES (?, ?, ?, ?, ?)
+			`,
+			selector.url,
+			selector.hostname,
+			selector.createdAtUtc,
+			selector.checksum,
+			selector.text,
 		);
-
-		return result;
-	}
-
-	/** Gets a SHA1 checksum of (baseUrl + screenshotBase64) */
-	private getChecksum(baseUrl: string, screenshotBase64: string) {
-		const hash = crypto.createHash("sha1");
-		hash.update(baseUrl);
-		hash.update(screenshotBase64);
-		return hash.digest("hex");
 	}
 
 	private async isTableEmpty(tableName: string): Promise<boolean> {
 		const result = await Db.connection.get<{ count: number }>(`SELECT COUNT(*) as count FROM ${tableName}`);
-
 		return result?.count === 0;
 	}
 

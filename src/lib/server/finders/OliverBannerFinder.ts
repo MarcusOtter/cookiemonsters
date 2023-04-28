@@ -1,13 +1,11 @@
 import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
-import ViewportFindResult from "$lib/ViewportFindResult";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
-import { getElementOpeningTag, getElementsWithWords, getUniqueCssSelector, getViewportSize } from "../puppeteerHelpers";
+import { getElementOpeningTag, getElementsWithWords, getUniqueCssSelector } from "../puppeteerHelpers";
 
 export default class OliverBannerFinder implements BannerFinder {
 	/** @inheritdoc */
-	async findBanner(page: Page): Promise<ViewportFindResult> {
-		const startTime = performance.now();
+	async findBannerSelector(page: Page): Promise<string> {
 		const commonPhrases = getUniqueCommonPhrases();
 		const elementsWithKeyWords = await getElementsWithWords(page, commonPhrases);
 		const cookieBannerElements: ElementHandle<Element>[] = [];
@@ -23,15 +21,12 @@ export default class OliverBannerFinder implements BannerFinder {
 		console.log(`Found ${cookieBannerElements.length} elements`);
 		const cookieBanner = await this.findMostCommonAncestorWithBackgroundColor(cookieBannerElements);
 		if (!cookieBanner) {
-			const screenshot = (await page.screenshot({ encoding: "base64" })) as string;
-			return new ViewportFindResult(false, getViewportSize(page), screenshot, performance.now() - startTime, "");
+			return "";
 		}
 
 		console.log(`Found cookie banner in ${page.url()}:`);
-		const screenshot = (await cookieBanner.screenshot({ encoding: "base64" })) as string;
 		const selector = await getUniqueCssSelector(cookieBanner as ElementHandle<HTMLElement>, page);
-
-		return new ViewportFindResult(true, getViewportSize(page), screenshot, performance.now() - startTime, selector);
+		return selector;
 	}
 
 	/**
