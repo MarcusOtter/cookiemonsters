@@ -115,13 +115,19 @@ export const GET = (async (request): Promise<Response> => {
  */
 async function getScreenshot(selector: string, page: Page): Promise<string> {
 	if (selector === "") return "";
+	console.time("screenshot");
 
 	const banner = await page.$(selector);
-	const isOnScreen = banner && (await banner.isIntersectingViewport({ threshold: 0.01 }));
+	// TODO: This is not a good way to measure if it is visible or not, I also forgot why I added this
+	// EDIT: It could actually be some other mobile vs desktop thing causing issues
+	const isOnScreen = banner; /*&& (await banner.isIntersectingViewport());*/
 
 	if (isOnScreen) {
-		return (await banner.screenshot({ encoding: "base64" })).toString();
+		const screenshot = await banner.screenshot({ encoding: "base64" });
+		console.timeEnd("screenshot");
+		return screenshot.toString();
 	}
 
+	console.timeEnd("screenshot");
 	return "";
 }
