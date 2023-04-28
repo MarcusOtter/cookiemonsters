@@ -4,9 +4,15 @@ import crypto from "crypto";
 import type BannerSelector from "./BannerSelector";
 import getBaseUrl from "../utils/getBaseUrl";
 
-export default class Db {
-	private static connection: Database<sqlite3.Database, sqlite3.Statement> | undefined;
+import insert_cookies from "./sql/insert_cookies.sql?raw";
+import create_tables from "./sql/create_tables.sql?raw";
 
+type DbConnection = Database<sqlite3.Database, sqlite3.Statement>;
+
+export default class Db {
+	private static connection: DbConnection;
+
+	// Do not forget to invoke this method as soon as Db is created
 	public async init() {
 		if (Db.connection) {
 			return;
@@ -19,14 +25,14 @@ export default class Db {
 
 		console.log("Database connection opened.");
 
-		await this.createTables(Db.connection);
+		await this.createTables();
 	}
 
 	// TODO: Do not take the screenshot here, just take full url
 	public async getSelector(fullUrl: string, screenshotBase64: string) {
 		const baseUrl = getBaseUrl(fullUrl);
 		const checksum = this.getChecksum(baseUrl, screenshotBase64);
-		const result = await Db.connection?.get<BannerSelector>(
+		const result = await Db.connection.get<BannerSelector>(
 			`SELECT * FROM "BannerSelector" WHERE "checksum" = ?`,
 			checksum,
 		);
@@ -56,42 +62,23 @@ export default class Db {
 		return hash.digest("hex");
 	}
 
-	private async createTables(database: Database<sqlite3.Database, sqlite3.Statement>) {
-		await database.exec("PRAGMA foreign_keys = ON;");
+	private async isTableEmpty(tableName: string): Promise<boolean> {
+		const result = await Db.connection.get<{ count: number }>(`SELECT COUNT(*) as count FROM ${tableName}`);
 
-		await database.exec(`
-			CREATE TABLE IF NOT EXISTS "BannerSelector" (
-				"id"			INTEGER NOT NULL UNIQUE,
-				"url"			TEXT NOT NULL,
-				"createdAtUtc"	TEXT NOT NULL,
-				"checksum"		TEXT NOT NULL UNIQUE,
-				"selector"		TEXT NOT NULL,
-				
-				PRIMARY KEY("id" AUTOINCREMENT)
-			);
-	
-			CREATE UNIQUE INDEX IF NOT EXISTS "index_checksum" ON "BannerSelector" (
-				"checksum"	ASC
-			);
-		`);
+		return result?.count === 0;
+	}
 
-		await database.exec(`
-			CREATE TABLE IF NOT EXISTS "Cookie" (
-				"id"			TEXT NOT NULL UNIQUE,
-				"platform"		TEXT NOT NULL,
-				"category"		TEXT NOT NULL,
-				"name"			TEXT NOT NULL,
-				"domain"		TEXT NOT NULL,
-				"description"	TEXT NOT NULL,
-				"retention"		TEXT NOT NULL,
-				"controller"	TEXT NOT NULL,
-				"privacyLink"	TEXT,
-				"wildcardMatch"	INTEGER NOT NULL,
-	
-				PRIMARY KEY("id")
-			)
-		`);
+	private async createTables() {
+		const conn = Db.connection;
 
-		// TODO: Add indices for Cookie table
+		await conn.exec("PRAGMA foreign_keys = ON;");
+		await conn.exec(create_tables);
+
+		// Insert all the cookies if the table is empty
+		if (await this.isTableEmpty("Cookie")) {
+			await conn.exec(insert_cookies);
+		}
+
+		// TODO: Add indices for Cookie table (in the create_tables.sql file)
 	}
 }
