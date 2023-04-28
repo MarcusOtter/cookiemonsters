@@ -1,20 +1,11 @@
-import ViewportFindResult from "$lib/ViewportFindResult";
 import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
-import {
-	getElementOpeningTag,
-	getElementsWithWords,
-	getUniqueCssSelector,
-	getViewportSize,
-	screenshotAsBase64,
-} from "../puppeteerHelpers";
+import { getElementOpeningTag, getElementsWithWords, getUniqueCssSelector } from "../puppeteerHelpers";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
 
 // TODO: Needs a big refactor.
 export default class MarcusUltraFinder implements BannerFinder {
-	async findBanner(page: Page): Promise<ViewportFindResult> {
-		const startTime = performance.now();
-
+	async findBannerSelector(page: Page): Promise<string> {
 		console.log("##### MARCUS ULTRA START #####");
 
 		/*
@@ -174,15 +165,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 			console.log("The best element is", await getElementOpeningTag(bestElement));
 		}
 
-		const screenshot = await screenshotAsBase64(bestElement ?? page);
 		const selector = bestElement ? await getUniqueCssSelector(bestElement as ElementHandle<HTMLElement>, page) : "";
-
-		return new ViewportFindResult(
-			bestElement != undefined,
-			getViewportSize(page),
-			screenshot,
-			performance.now() - startTime,
-			selector,
-		);
+		return selector;
 	}
 }

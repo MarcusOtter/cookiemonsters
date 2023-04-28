@@ -1,5 +1,4 @@
 import type BannerFinder from "./BannerFinder";
-import MarcusDensityFinder from "./MarcusDensityFinder";
 import MarcusUltraFinder from "./MarcusUltraFinder";
 import OliverBannerFinder from "./OliverBannerFinder";
 

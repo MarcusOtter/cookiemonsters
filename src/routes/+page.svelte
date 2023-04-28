@@ -1,9 +1,9 @@
 <script lang="ts">
 	let url = "";
 
-	function goToAnalysis() {
+	function goToBanner() {
 		// TODO: Validation on url?
-		window.location.href = `/analysis?` + new URLSearchParams({ url });
+		window.location.href = `/banner?` + new URLSearchParams({ url });
 	}
 </script>
 
@@ -14,7 +14,7 @@
 	delectus quo. Maiores saepe molestias fuga atque animi dolorum nostrum alias nobis
 </p>
 
-<form on:submit|preventDefault={goToAnalysis}>
+<form on:submit|preventDefault={goToBanner}>
 	<label for="url">Web address</label>
 	<div class="inputs">
 		<input id="url" bind:value={url} placeholder="https://example.com" required size="4" />

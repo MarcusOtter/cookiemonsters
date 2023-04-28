@@ -1,15 +1,22 @@
 CREATE TABLE IF NOT EXISTS "BannerSelector" (
 	"id"			INTEGER NOT NULL UNIQUE,
 	"url"			TEXT NOT NULL,
+	"hostname"		TEXT NOT NULL,
 	"createdAtUtc"	TEXT NOT NULL,
-	"checksum"		TEXT NOT NULL UNIQUE,
-	"selector"		TEXT NOT NULL,
+	"checksum"		TEXT NOT NULL,
+	"text"			TEXT NOT NULL,
 	
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "index_checksum" ON "BannerSelector" (
-	"checksum"	ASC
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_selector_url_createdAtUtc" ON "BannerSelector" (
+	url,
+	createdAtUtc DESC
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_selector_hostname_createdAtUtc" ON "BannerSelector" (
+	hostname,
+	createdAtUtc DESC
 );
 
 CREATE TABLE IF NOT EXISTS "Cookie" (
