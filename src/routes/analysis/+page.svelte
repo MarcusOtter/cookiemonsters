@@ -6,6 +6,7 @@
 	let results: AnalysisResult[] = [];
 	let isLoading = false;
 	let targetUrl = "";
+	let selector = "";
 	let errorMessage = "";
 	let selectedResultIndex = 0;
 
@@ -13,6 +14,7 @@
 	onMount(async () => {
 		const params = new URLSearchParams(window.location.search);
 		targetUrl = params.get("url") ?? "";
+		selector = params.get("selector") ?? "";
 
 		if (!targetUrl) {
 			window.location.href = "/";
@@ -32,7 +34,7 @@
 		isLoading = true;
 		results = [];
 
-		const apiUrl = `/api/analysis?` + new URLSearchParams({ url: targetUrl });
+		const apiUrl = `/api/analysis?` + new URLSearchParams({ url: targetUrl, selector: selector });
 		const response = await fetch(apiUrl, { method: "GET" });
 		if (!response.ok) {
 			errorMessage = await response.text();
