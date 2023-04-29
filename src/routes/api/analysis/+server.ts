@@ -7,6 +7,31 @@ import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
 import { getElementOpeningTag, getViewportSizeIndividually } from "$lib/server/puppeteerHelpers";
 import type { ElementHandle, Page } from "puppeteer";
+import { encode } from "gpt-3-encoder";
+import { OPENAI_API_KEY } from "$env/static/private";
+import { Configuration, OpenAIApi } from "openai";
+const configuration = new Configuration({
+	apiKey: OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
+
+const systemPrompt = `You are a legal assistant that has a few jobs:
+1. Determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge.
+2. Check whether cookies' purposes are described clearly.
+3. Check what the main language of the text is (in ISO 639-1).
+4. Check which clickable element is used to REJECT ALL UNNECESSARY cookies (answer with the id provided for the element). Set to null if there is no clickable element to reject all unnecessary cookies.
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows (for booleans, use true or false):
+{"language": "en", "legal-jargon": true, "purpose-described": false, "reject-all-btn": 1}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
+const apiTotalTokenLimit = 4000;
+const longestPossibleOutput = 31;
 
 export const GET = (async (request): Promise<Response> => {
 	console.log(request.url.searchParams);
@@ -79,16 +104,49 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	console.log(`Cookie banner takes ${cookieBannerSizePercentageDesktop}% of the viewport on Desktop.`); // RESULT: Banner size
 	console.log(`Cookie banner takes ${cookieBannerSizePercentageMobile}% of the viewport on Mobile.`); // RESULT: Banner size
 
-	const textAndTypeDesktop = desktopBanner ? await getTextAndType(desktopBanner) : "";
-	console.log(textAndTypeDesktop);
+	if (desktopBanner) {
+		const textAndTypeDesktop = await getTextAndType(desktopBanner);
 
-	const textAndTypeMobile = mobileBanner ? await getTextAndType(mobileBanner) : "";
-	console.log(textAndTypeMobile);
+		for (const chunk of textAndTypeDesktop["chunks"]) {
+			console.log(chunk);
+			console.log(await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput));
+		}
+	}
+	/*if (mobileBanner) {
+		const textAndTypeMobile = await getTextAndType(mobileBanner);
+	}*/
+
+	// TODO: Check if desktop and mobile banner are identical, if so, do the text analysis only once.
+	// TODO: Implement Tokenizer and chunking, so that we don't go over 4000 tokens per request.
 
 	await desktopPage.close();
 	await mobilePage.close();
 
 	return results;
+}
+
+async function sendChatAPIRequest(system: string, input: string, maxOutputTokens: number) {
+	const completion = await openai.createChatCompletion({
+		model: "gpt-3.5-turbo",
+		messages: [
+			{ role: "system", content: system },
+			{ role: "user", content: input },
+		],
+		// max_tokens: maxOutputTokens,
+		temperature: 0,
+	});
+	console.log(completion.data.usage);
+	return completion.data.choices[0].message;
+}
+
+function calculateTokens(text: string): number {
+	const encoded = encode(text);
+
+	return encoded.length;
+}
+
+function calculateInputMaxTokens(): number {
+	return apiTotalTokenLimit - calculateTokens(systemPrompt) - longestPossibleOutput;
 }
 
 async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promise<number> {
@@ -102,7 +160,9 @@ async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promi
 	return (boundingBoxArea / viewportArea) * 100;
 }
 
-async function getTextAndType(element: ElementHandle): Promise<string> {
+async function getTextAndType(
+	element: ElementHandle,
+): Promise<{ elementList: { id: number; tag: string; text: string }[]; chunks: string[] }> {
 	const semanticTags = ["a", "button", "input", "select", "textarea"];
 
 	const textAndType = await element.evaluate((el, semanticTags) => {
@@ -134,7 +194,7 @@ async function getTextAndType(element: ElementHandle): Promise<string> {
 
 	removeDuplicates(textAndType, duplicates);
 
-	return buildFinalText(textAndType);
+	return buildFinalElementList(textAndType);
 }
 
 function findDuplicates(textAndType: ([string, string] | null)[], semanticTags: string[]) {
@@ -170,14 +230,32 @@ function removeDuplicates(
 	}
 }
 
-function buildFinalText(textAndType: ([string, string] | null)[]): string {
-	let finalText = "";
+function buildFinalElementList(textAndType: ([string, string] | null)[]): {
+	elementList: { id: number; tag: string; text: string }[];
+	chunks: string[];
+} {
+	const finalTexts = [];
+	//let finalText = "";
+	let count = 0;
+	const chunkMaxTokenSize = calculateInputMaxTokens();
+	const chunks = [];
+	let currentChunk = "";
 
 	for (const tType of textAndType) {
 		if (tType) {
-			finalText += `${tType[0]}: "${tType[1]}" `;
+			finalTexts.push({ id: count, tag: tType[0], text: tType[1] });
+			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
+			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
+				chunks.push(currentChunk);
+				currentChunk = "";
+			}
+			currentChunk += elementText;
+			count++;
 		}
 	}
 
-	return finalText;
+	chunks.push(currentChunk); // Last chunk addition.
+
+	// TODO: The finalText is too simple rn. Should chunk it simultaneously to control prompt size.
+	return { elementList: finalTexts, chunks: chunks };
 }
