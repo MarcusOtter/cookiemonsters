@@ -107,3 +107,7 @@ export async function getElementOpeningTag(element: ElementHandle): Promise<stri
 export function getViewportSize(page: Page): string {
 	return `${page.viewport()?.width}x${page.viewport()?.height}`;
 }
+
+export function getViewportSizeIndividually(page: Page): (number | undefined)[] {
+	return [page.viewport()?.width, page.viewport()?.height];
+}
