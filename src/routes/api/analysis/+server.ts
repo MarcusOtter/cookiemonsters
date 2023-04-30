@@ -104,12 +104,105 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	console.log(`Cookie banner takes ${cookieBannerSizePercentageDesktop}% of the viewport on Desktop.`); // RESULT: Banner size
 	console.log(`Cookie banner takes ${cookieBannerSizePercentageMobile}% of the viewport on Mobile.`); // RESULT: Banner size
 
+	// Need to add more explanation to this.
+	const legalJargonPrompt = `You are a legal assistant and your job is to determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge. Give the result as boolean.
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"legal-jargon": true}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
+	const cookiePurposePrompt = `You are a legal assistant and your job is to determine whether cookies' purposes are described clearly.
+
+For example "user experience enhancement" and "We use cookies to deliver the best possible web experience" are too vague  or misleading.
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"purpose-described": true}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
+	const lanuagePrompt = `You are a legal assistant and your job is to determine what the main language of the text is (in ISO 639-1).
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"lang": "en"}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
+	const rejectAllPrompt = `You are a legal assistant and your job is to determine which clickable element is used to REJECT ALL UNNECESSARY cookies.
+
+Answer with the id provided for the element. Set to null if there is no clickable element to reject all unnecessary cookies.
+
+Here are some examples of Reject All buttons:
+
+{ID}-a: "Reject All"
+{ID}-button: "Reject"
+{ID}-a: "Kiellä"
+
+Buttons to "manage settings" etc are NOT considered Reject All -buttons.
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"reject-btn": 3}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
+	const impliedConsent = `You are a legal assistant and your job is to determine whether this cookie banner assumes a user's implied consent. Make sure that consent is not implied from normal website usage such as scrolling or using the website, and that a button click is required to give consent. Consent has to always be opt-in, not opt-out.
+
+Give the result as boolean.
+
+Here is an example of a cookie banner that assumes implied consent:
+{ID}-p:"Our website uses cookies to make the website work well for you.", {ID}-a:"Read more about cookies.", {ID}-button:"OK"
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"implied-consent": true}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
 	if (desktopBanner) {
 		const textAndTypeDesktop = await getTextAndType(desktopBanner);
 
 		for (const chunk of textAndTypeDesktop["chunks"]) {
 			console.log(chunk);
-			console.log(await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput));
+			console.log(
+				`Language check: ${JSON.stringify(await sendChatAPIRequest(lanuagePrompt, chunk, longestPossibleOutput))}`,
+			);
+			console.log(
+				`Legal Jargon check: ${JSON.stringify(
+					await sendChatAPIRequest(legalJargonPrompt, chunk, longestPossibleOutput),
+				)}`,
+			);
+			console.log(
+				`Cookie purpose check: ${JSON.stringify(
+					await sendChatAPIRequest(cookiePurposePrompt, chunk, longestPossibleOutput),
+				)}`,
+			);
+			console.log(
+				`Reject All check: ${JSON.stringify(await sendChatAPIRequest(rejectAllPrompt, chunk, longestPossibleOutput))}`,
+			);
+			console.log(
+				`Implied Consent check: ${JSON.stringify(
+					await sendChatAPIRequest(impliedConsent, chunk, longestPossibleOutput),
+				)}`,
+			);
 		}
 	}
 	/*if (mobileBanner) {
@@ -117,7 +210,6 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	}*/
 
 	// TODO: Check if desktop and mobile banner are identical, if so, do the text analysis only once.
-	// TODO: Implement Tokenizer and chunking, so that we don't go over 4000 tokens per request.
 
 	await desktopPage.close();
 	await mobilePage.close();
@@ -132,7 +224,7 @@ async function sendChatAPIRequest(system: string, input: string, maxOutputTokens
 			{ role: "system", content: system },
 			{ role: "user", content: input },
 		],
-		// max_tokens: maxOutputTokens,
+		max_tokens: maxOutputTokens,
 		temperature: 0,
 	});
 	console.log(completion.data.usage);
