@@ -15,23 +15,48 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-const systemPrompt = `You are a legal assistant that has a few jobs:
-1. Determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge.
-2. Check whether cookies' purposes are described clearly.
-3. Check what the main language of the text is (in ISO 639-1).
-4. Check which clickable element is used to REJECT ALL UNNECESSARY cookies (answer with the id provided for the element). Set to null if there is no clickable element to reject all unnecessary cookies.
+const systemPrompt = `You are a legal assistant and your job is to:
+
+1. Determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge. Give the result as boolean.
+
+2. Determine whether cookies' purposes are described clearly.
+For example "user experience enhancement" and "We use cookies to deliver the best possible web experience" are too vague  or misleading.
+
+3. Determine what the main language of the text is (in ISO 639-1).
+
+4. Determine which clickable element is used to REJECT ALL UNNECESSARY cookies.
+Answer with the id provided for the element. Set to null if there is no clickable element to reject all unnecessary cookies.
+Here are some examples of Reject All buttons:
+{ID}-a: "Reject All"
+{ID}-button: "Reject"
+{ID}-a: "Kiellä"
+Buttons to "manage settings" etc are NOT considered Reject All -buttons.
+
+5. Determine which clickable element is used to ACCEPT ALL cookies.
+Answer with the id provided for the element. Set to null if there is no clickable element to accept all cookies.
+Here are some examples of Accept All buttons:
+{ID}-a: "Accept All"
+{ID}-button: "Accept"
+{ID}-a: "Salli"
+
+6. Determine whether this cookie banner assumes a user's implied consent. Make sure that consent is not implied from normal website usage such as scrolling or using the website, and that a button click is required to give consent. Consent has to always be opt-in, not opt-out.
+
+Give the result as boolean.
+
+Here is an example of a cookie banner that assumes implied consent:
+{ID}-p:"Our website uses cookies to make the website work well for you.", {ID}-a:"Read more about cookies.", {ID}-button:"OK"
 
 The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
 {ID}-{TAG}:"{TEXT}"
 
 Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
 
-Provide the output as follows (for booleans, use true or false):
-{"language": "en", "legal-jargon": true, "purpose-described": false, "reject-all-btn": 1}
+Provide the output as follows:
+{"legal-jargon": true, "purpose-described": false, "lang": "en", "reject-btn": 3, "accept-btn": 8, "implied-consent": true}
 DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 
 const apiTotalTokenLimit = 4000;
-const longestPossibleOutput = 31;
+const longestPossibleOutput = 50;
 
 export const GET = (async (request): Promise<Response> => {
 	console.log(request.url.searchParams);
@@ -161,6 +186,25 @@ Provide the output as follows:
 {"reject-btn": 3}
 DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 
+	const acceptAllPrompt = `You are a legal assistant and your job is to determine which clickable element is used to ACCEPT ALL cookies.
+
+Answer with the id provided for the element. Set to null if there is no clickable element to accept all cookies.
+
+Here are some examples of Accept All buttons:
+
+{ID}-a: "Accept All"
+{ID}-button: "Accept"
+{ID}-a: "Salli"
+
+The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
+{ID}-{TAG}:"{TEXT}"
+
+Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
+
+Provide the output as follows:
+{"accept-btn": 3}
+DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+
 	const impliedConsent = `You are a legal assistant and your job is to determine whether this cookie banner assumes a user's implied consent. Make sure that consent is not implied from normal website usage such as scrolling or using the website, and that a button click is required to give consent. Consent has to always be opt-in, not opt-out.
 
 Give the result as boolean.
@@ -180,9 +224,18 @@ DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 	if (desktopBanner) {
 		const textAndTypeDesktop = await getTextAndType(desktopBanner);
 
+		const results = [];
+		const chunkSizes = [];
+
 		for (const chunk of textAndTypeDesktop["chunks"]) {
 			console.log(chunk);
-			console.log(
+			const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
+			console.log(`Chunk check: ${JSON.stringify(gptResult)}`);
+			if (gptResult) {
+				chunkSizes.push(calculateTokens(chunk));
+				results.push(JSON.parse(gptResult.content));
+			}
+			/*console.log(
 				`Language check: ${JSON.stringify(await sendChatAPIRequest(lanuagePrompt, chunk, longestPossibleOutput))}`,
 			);
 			console.log(
@@ -199,11 +252,18 @@ DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 				`Reject All check: ${JSON.stringify(await sendChatAPIRequest(rejectAllPrompt, chunk, longestPossibleOutput))}`,
 			);
 			console.log(
+				`Accept All check: ${JSON.stringify(await sendChatAPIRequest(acceptAllPrompt, chunk, longestPossibleOutput))}`,
+			);
+			console.log(
 				`Implied Consent check: ${JSON.stringify(
 					await sendChatAPIRequest(impliedConsent, chunk, longestPossibleOutput),
 				)}`,
-			);
+			);*/
 		}
+
+		//mergeResults
+		const result = mergeResults(results, chunkSizes);
+		console.log(`Final result: ${JSON.stringify(result)}`);
 	}
 	/*if (mobileBanner) {
 		const textAndTypeMobile = await getTextAndType(mobileBanner);
@@ -327,9 +387,9 @@ function buildFinalElementList(textAndType: ([string, string] | null)[]): {
 	chunks: string[];
 } {
 	const finalTexts = [];
-	//let finalText = "";
 	let count = 0;
 	const chunkMaxTokenSize = calculateInputMaxTokens();
+	console.log(`Chunk's Max Token size is ${chunkMaxTokenSize}`);
 	const chunks = [];
 	let currentChunk = "";
 
@@ -350,4 +410,71 @@ function buildFinalElementList(textAndType: ([string, string] | null)[]): {
 
 	// TODO: The finalText is too simple rn. Should chunk it simultaneously to control prompt size.
 	return { elementList: finalTexts, chunks: chunks };
+}
+
+interface Result {
+	"legal-jargon": boolean;
+	"purpose-described": boolean;
+	lang: string;
+	"reject-btn": number | null;
+	"accept-btn": number | null;
+	"implied-consent": boolean;
+}
+
+function mergeResults(results: Result[], inputSizes: number[]): Result {
+	const finalResult: Result = {
+		"legal-jargon": false,
+		"purpose-described": false,
+		lang: "",
+		"reject-btn": null,
+		"accept-btn": null,
+		"implied-consent": true,
+	};
+
+	const langCounts: { [key: string]: number } = {};
+
+	let rejectBtnIndex = -1;
+	let acceptBtnIndex = -1;
+
+	for (let i = 0; i < results.length; i++) {
+		const result = results[i];
+
+		// Merge legal-jargon
+		finalResult["legal-jargon"] = finalResult["legal-jargon"] || result["legal-jargon"];
+
+		// Merge purpose-described
+		finalResult["purpose-described"] = finalResult["purpose-described"] || result["purpose-described"];
+
+		// Merge language
+		if (result["lang"]) {
+			langCounts[result["lang"]] = (langCounts[result["lang"]] || 0) + 1;
+		}
+
+		// Merge reject-btn and accept-btn based on input size (higher weight for larger inputs)
+		if (
+			result["reject-btn"] !== null &&
+			(finalResult["reject-btn"] === null || inputSizes[i] > inputSizes[rejectBtnIndex])
+		) {
+			rejectBtnIndex = i;
+		}
+
+		if (
+			result["accept-btn"] !== null &&
+			(finalResult["accept-btn"] === null || inputSizes[i] > inputSizes[acceptBtnIndex])
+		) {
+			acceptBtnIndex = i;
+		}
+
+		// Merge implied-consent
+		finalResult["implied-consent"] = finalResult["implied-consent"] && result["implied-consent"];
+	}
+
+	// Determine final language
+	finalResult["lang"] = Object.keys(langCounts).reduce((a, b) => (langCounts[a] >= langCounts[b] ? a : b));
+
+	// Assign the reject-btn and accept-btn from the selected chunks
+	finalResult["reject-btn"] = rejectBtnIndex >= 0 ? results[rejectBtnIndex]["reject-btn"] : null;
+	finalResult["accept-btn"] = acceptBtnIndex >= 0 ? results[acceptBtnIndex]["accept-btn"] : null;
+
+	return finalResult;
 }
