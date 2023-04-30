@@ -60,6 +60,9 @@
 		<p>Found banner: {viewport.selector === "" ? "❌ No" : "✅ Yes"}</p>
 		<p>Time taken: {viewport.durationMs.toFixed(0)}ms</p>
 		<img src="data:image/png;base64,{viewport.screenshot}" alt="Screenshot" />
+		{#if viewport.selector !== ""}
+			<a href="/analysis?url={targetUrl}&selector={encodeURIComponent(viewport.selector)}">Analyze</a>
+		{/if}
 	{/each}
 {:else if isLoading}
 	<h2>Loading...</h2>
