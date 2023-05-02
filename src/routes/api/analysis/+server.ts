@@ -5,7 +5,7 @@ import getErrorMessage from "$lib/utils/getErrorMessage";
 import Db from "$lib/server/db/Db";
 import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
-import { getElementOpeningTag, getViewportSizeIndividually } from "$lib/server/puppeteerHelpers";
+import { getElementOpeningTag, getViewportSizeIndividually, getUniqueCssSelector } from "$lib/server/puppeteerHelpers";
 import type { ElementHandle, Page } from "puppeteer";
 import { encode } from "gpt-3-encoder";
 import { OPENAI_API_KEY } from "$env/static/private";
@@ -120,14 +120,12 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	// }
 
 	const desktopBanner = await desktopPage.$(selector);
-	const mobileBanner = await mobilePage.$(selector);
 
 	const cookieBannerSizePercentageDesktop = desktopBanner
 		? await getBannerAreaPercentage(desktopBanner, desktopPage)
 		: 0;
-	const cookieBannerSizePercentageMobile = mobileBanner ? await getBannerAreaPercentage(mobileBanner, mobilePage) : 0;
+
 	console.log(`Cookie banner takes ${cookieBannerSizePercentageDesktop}% of the viewport on Desktop.`); // RESULT: Banner size
-	console.log(`Cookie banner takes ${cookieBannerSizePercentageMobile}% of the viewport on Mobile.`); // RESULT: Banner size
 
 	// Need to add more explanation to this.
 	const legalJargonPrompt = `You are a legal assistant and your job is to determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge. Give the result as boolean.
@@ -229,11 +227,11 @@ DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 
 		for (const chunk of textAndTypeDesktop["chunks"]) {
 			console.log(chunk);
-			const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
+			const gptResult = ""; //await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
 			console.log(`Chunk check: ${JSON.stringify(gptResult)}`);
 			if (gptResult) {
 				chunkSizes.push(calculateTokens(chunk));
-				results.push(JSON.parse(gptResult.content));
+				results.push(JSON.parse(gptResult)); //.content));
 			}
 			/*console.log(
 				`Language check: ${JSON.stringify(await sendChatAPIRequest(lanuagePrompt, chunk, longestPossibleOutput))}`,
@@ -264,6 +262,17 @@ DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 		//mergeResults
 		const result = mergeResults(results, chunkSizes);
 		console.log(`Final result: ${JSON.stringify(result)}`);
+
+		const acceptButtonElement = textAndTypeDesktop.elementList.find((element) => element.id == result["accept-btn"]);
+		const rejectButtonElement = textAndTypeDesktop.elementList.find((element) => element.id == result["reject-btn"]);
+
+		if (acceptButtonElement) {
+			console.log(`Accept button selector: ${JSON.stringify(acceptButtonElement.element)}`);
+		}
+
+		if (rejectButtonElement) {
+			console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.element)}`);
+		}
 	}
 	/*if (mobileBanner) {
 		const textAndTypeMobile = await getTextAndType(mobileBanner);
@@ -312,35 +321,76 @@ async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promi
 	return (boundingBoxArea / viewportArea) * 100;
 }
 
-async function getTextAndType(
-	element: ElementHandle,
-): Promise<{ elementList: { id: number; tag: string; text: string }[]; chunks: string[] }> {
+async function getTextAndType(element: ElementHandle): Promise<{
+	elementList: { id: number; tag: string; text: string; element: ElementHandle<Element> }[];
+	chunks: string[];
+}> {
 	const semanticTags = ["a", "button", "input", "select", "textarea"];
-
-	const textAndType = await element.evaluate((el, semanticTags) => {
-		function traverse(node: Node, result: [string, string][], semanticTags: string[]): ([string, string] | null)[] {
+	console.log("starting tt");
+	/*const textAndType = await element.evaluate(async (el, semanticTags) => {
+		async function traverse(
+			node: Node,
+			result: [string, string, HTMLElement][],
+			semanticTags: string[],
+		): Promise<([string, string, HTMLElement] | null)[]> {
+			const nodeElement = node as HTMLElement;
 			if (node.nodeType === Node.TEXT_NODE) {
 				const text = node.textContent?.trim();
 				if (text) {
-					result.push(["p", text.replace(/\s+/g, " ").trim()]);
+					result.push(["p", text.replace(/\s+/g, " ").trim(), nodeElement]);
 				}
 			} else if (node.nodeType === Node.ELEMENT_NODE) {
-				const element = node as HTMLElement;
-				const tagName = element.tagName.toLowerCase();
+				const tagName = nodeElement.tagName.toLowerCase();
 
 				if (semanticTags.includes(tagName)) {
-					result.push([tagName, element.textContent?.replace(/\s+/g, " ").trim() || ""]);
+					result.push([tagName, nodeElement.textContent?.replace(/\s+/g, " ").trim() || "", nodeElement]);
 				}
 
-				for (const child of Array.from(element.childNodes)) {
-					traverse(child, result, semanticTags);
+				for (const child of Array.from(nodeElement.childNodes)) {
+					await traverse(child, result, semanticTags);
 				}
 			}
 
 			return result;
 		}
-		return traverse(el, [], semanticTags);
-	}, semanticTags);
+		return await traverse(el, [], semanticTags);
+	}, semanticTags);*/
+
+	async function traverse(
+		node: ElementHandle<Element>,
+		result: [string, string, ElementHandle<Element>][],
+		semanticTags: string[],
+	): Promise<([string, string, ElementHandle<Element>] | null)[]> {
+		const nodeType = await node.evaluate((el) => el.nodeType);
+		const textNodeType = await node.evaluate(() => Node.TEXT_NODE);
+		const elementNodeType = await node.evaluate(() => Node.ELEMENT_NODE);
+
+		console.log("test");
+		if (nodeType === textNodeType) {
+			const text = await node.evaluate((el) => el.textContent?.trim());
+			if (text) {
+				result.push(["p", text.replace(/\s+/g, " ").trim(), node]);
+			}
+		} else if (nodeType === elementNodeType) {
+			const tagName = await node.evaluate((el) => el.tagName.toLowerCase());
+			if (semanticTags.includes(tagName)) {
+				const textContent = await node.evaluate((el) => el.textContent?.replace(/\s+/g, " ").trim() || "");
+				result.push([tagName, textContent, node]);
+			}
+
+			const childNodes = await node.evaluateHandle((el) => Array.from(el.childNodes));
+			const children = await childNodes.getProperties();
+
+			for (const child of children.values()) {
+				const childElement = child as ElementHandle<HTMLElement>;
+				await traverse(childElement, result, semanticTags);
+			}
+		}
+
+		return result;
+	}
+	console.log("starting traverse");
+	const textAndType = await traverse(element, [], semanticTags);
 
 	const duplicates = findDuplicates(textAndType, semanticTags);
 
@@ -349,7 +399,7 @@ async function getTextAndType(
 	return buildFinalElementList(textAndType);
 }
 
-function findDuplicates(textAndType: ([string, string] | null)[], semanticTags: string[]) {
+function findDuplicates(textAndType: ([string, string, ElementHandle<Element>] | null)[], semanticTags: string[]) {
 	const duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[] = [];
 
 	textAndType.forEach((currentElement, i) => {
@@ -372,7 +422,7 @@ function findDuplicates(textAndType: ([string, string] | null)[], semanticTags: 
 }
 
 function removeDuplicates(
-	textAndType: ([string, string] | null)[],
+	textAndType: ([string, string, ElementHandle<Element>] | null)[],
 	duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[],
 ) {
 	for (const duplicate of duplicates) {
@@ -382,8 +432,8 @@ function removeDuplicates(
 	}
 }
 
-function buildFinalElementList(textAndType: ([string, string] | null)[]): {
-	elementList: { id: number; tag: string; text: string }[];
+function buildFinalElementList(textAndType: ([string, string, ElementHandle<Element>] | null)[]): {
+	elementList: { id: number; tag: string; text: string; element: ElementHandle<Element> }[];
 	chunks: string[];
 } {
 	const finalTexts = [];
@@ -395,7 +445,9 @@ function buildFinalElementList(textAndType: ([string, string] | null)[]): {
 
 	for (const tType of textAndType) {
 		if (tType) {
-			finalTexts.push({ id: count, tag: tType[0], text: tType[1] });
+			console.log(tType[2]);
+			console.log(typeof tType[2]);
+			finalTexts.push({ id: count, tag: tType[0], text: tType[1], element: tType[2] });
 			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
 			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
 				chunks.push(currentChunk);
