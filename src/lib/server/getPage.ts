@@ -43,7 +43,7 @@ async function getBrowser(): Promise<Browser> {
 	}
 
 	browser = await puppeteer.launch({
-		headless: false,
+		headless: true,
 
 		// These args be needed to not get blocked by CORS on some sites
 		// However, I'm not sure what the security implications are since we are

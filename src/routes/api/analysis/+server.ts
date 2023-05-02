@@ -1,6 +1,5 @@
 import type { RequestHandler } from "./$types";
 import { getDesktopPage, getMobilePage } from "$lib/server/getPage";
-import getBannerFinders from "$lib/server/finders/getBannerFinders";
 import getErrorMessage from "$lib/utils/getErrorMessage";
 import Db from "$lib/server/db/Db";
 import getChecksum from "$lib/utils/getChecksum";
@@ -14,6 +13,7 @@ const configuration = new Configuration({
 	apiKey: OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
+let desktopPage: Page;
 
 const systemPrompt = `You are a legal assistant and your job is to:
 
@@ -30,6 +30,7 @@ Here are some examples of Reject All buttons:
 {ID}-a: "Reject All"
 {ID}-button: "Reject"
 {ID}-a: "Kiellä"
+{ID}-button: "Only allow essential cookies"
 Buttons to "manage settings" etc are NOT considered Reject All -buttons.
 
 5. Determine which clickable element is used to ACCEPT ALL cookies.
@@ -96,7 +97,7 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 
 	// On second thought, maybe we can start with a desktop page and then resize it to
 	// mobile size? It would be a performance improvement and probably work (?)
-	const desktopPage = await getDesktopPage();
+	desktopPage = await getDesktopPage();
 	const mobilePage = await getMobilePage();
 
 	const requestTimeStart = performance.now();
@@ -119,105 +120,26 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	// 	results.push(analysisResult);
 	// }
 
+	const analysisResults = await analyzeBanner(selector);
+	console.log(JSON.stringify(analysisResults));
+	await desktopPage.close();
+	await mobilePage.close();
+
+	return results;
+}
+
+/**
+ * Runs the analyses for the cookie banner using the given selector.
+ * @async
+ * @param {string} selector - CSS selector to find the cookie banner.
+ * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
+ */
+async function analyzeBanner(selector: string): Promise<object> {
+	const checkResults = { "reject-button": "not found", nudging: "skipped", "banner-size": 0 };
+
 	const desktopBanner = await desktopPage.$(selector);
 
-	const cookieBannerSizePercentageDesktop = desktopBanner
-		? await getBannerAreaPercentage(desktopBanner, desktopPage)
-		: 0;
-
-	console.log(`Cookie banner takes ${cookieBannerSizePercentageDesktop}% of the viewport on Desktop.`); // RESULT: Banner size
-
-	// Need to add more explanation to this.
-	const legalJargonPrompt = `You are a legal assistant and your job is to determine whether the text contains legal jargon. The text should be readable by anyone without legal knowledge. Give the result as boolean.
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"legal-jargon": true}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-	const cookiePurposePrompt = `You are a legal assistant and your job is to determine whether cookies' purposes are described clearly.
-
-For example "user experience enhancement" and "We use cookies to deliver the best possible web experience" are too vague  or misleading.
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"purpose-described": true}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-	const lanuagePrompt = `You are a legal assistant and your job is to determine what the main language of the text is (in ISO 639-1).
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"lang": "en"}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-	const rejectAllPrompt = `You are a legal assistant and your job is to determine which clickable element is used to REJECT ALL UNNECESSARY cookies.
-
-Answer with the id provided for the element. Set to null if there is no clickable element to reject all unnecessary cookies.
-
-Here are some examples of Reject All buttons:
-
-{ID}-a: "Reject All"
-{ID}-button: "Reject"
-{ID}-a: "Kiellä"
-
-Buttons to "manage settings" etc are NOT considered Reject All -buttons.
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"reject-btn": 3}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-	const acceptAllPrompt = `You are a legal assistant and your job is to determine which clickable element is used to ACCEPT ALL cookies.
-
-Answer with the id provided for the element. Set to null if there is no clickable element to accept all cookies.
-
-Here are some examples of Accept All buttons:
-
-{ID}-a: "Accept All"
-{ID}-button: "Accept"
-{ID}-a: "Salli"
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"accept-btn": 3}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-	const impliedConsent = `You are a legal assistant and your job is to determine whether this cookie banner assumes a user's implied consent. Make sure that consent is not implied from normal website usage such as scrolling or using the website, and that a button click is required to give consent. Consent has to always be opt-in, not opt-out.
-
-Give the result as boolean.
-
-Here is an example of a cookie banner that assumes implied consent:
-{ID}-p:"Our website uses cookies to make the website work well for you.", {ID}-a:"Read more about cookies.", {ID}-button:"OK"
-
-The input is from a HTML DOM and has an index number and it's HTML-tag marked before the text of the element. Each element has the following structure:
-{ID}-{TAG}:"{TEXT}"
-
-Note that the input might contain special characters, these can be ignored. Elements are separated by commas.
-
-Provide the output as follows:
-{"implied-consent": true}
-DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
+	checkResults["banner-size"] = desktopBanner ? await getBannerAreaPercentage(desktopBanner, desktopPage) : 0;
 
 	if (desktopBanner) {
 		const textAndTypeDesktop = await getTextAndType(desktopBanner);
@@ -226,66 +148,123 @@ DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 		const chunkSizes = [];
 
 		for (const chunk of textAndTypeDesktop["chunks"]) {
-			console.log(chunk);
-			const gptResult = ""; //await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
-			console.log(`Chunk check: ${JSON.stringify(gptResult)}`);
+			const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
 			if (gptResult) {
 				chunkSizes.push(calculateTokens(chunk));
-				results.push(JSON.parse(gptResult)); //.content));
+				results.push(JSON.parse(gptResult.content));
 			}
-			/*console.log(
-				`Language check: ${JSON.stringify(await sendChatAPIRequest(lanuagePrompt, chunk, longestPossibleOutput))}`,
-			);
-			console.log(
-				`Legal Jargon check: ${JSON.stringify(
-					await sendChatAPIRequest(legalJargonPrompt, chunk, longestPossibleOutput),
-				)}`,
-			);
-			console.log(
-				`Cookie purpose check: ${JSON.stringify(
-					await sendChatAPIRequest(cookiePurposePrompt, chunk, longestPossibleOutput),
-				)}`,
-			);
-			console.log(
-				`Reject All check: ${JSON.stringify(await sendChatAPIRequest(rejectAllPrompt, chunk, longestPossibleOutput))}`,
-			);
-			console.log(
-				`Accept All check: ${JSON.stringify(await sendChatAPIRequest(acceptAllPrompt, chunk, longestPossibleOutput))}`,
-			);
-			console.log(
-				`Implied Consent check: ${JSON.stringify(
-					await sendChatAPIRequest(impliedConsent, chunk, longestPossibleOutput),
-				)}`,
-			);*/
 		}
 
-		//mergeResults
-		const result = mergeResults(results, chunkSizes);
-		console.log(`Final result: ${JSON.stringify(result)}`);
+		const gptResultMerged = mergeResults(results, chunkSizes);
+		console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
 
-		const acceptButtonElement = textAndTypeDesktop.elementList.find((element) => element.id == result["accept-btn"]);
-		const rejectButtonElement = textAndTypeDesktop.elementList.find((element) => element.id == result["reject-btn"]);
-
-		if (acceptButtonElement) {
-			console.log(`Accept button selector: ${JSON.stringify(acceptButtonElement.element)}`);
-		}
+		const acceptButtonElement = textAndTypeDesktop.elementList.find(
+			(element) => element.id == gptResultMerged["accept-btn"],
+		);
+		const rejectButtonElement = textAndTypeDesktop.elementList.find(
+			(element) => element.id == gptResultMerged["reject-btn"],
+		);
 
 		if (rejectButtonElement) {
 			console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.element)}`);
+
+			checkResults["reject-button"] = "found";
+
+			const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
+			if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
+				checkResults["reject-button"] = "in viewport";
+			}
+		}
+
+		if (rejectButtonElement && acceptButtonElement) {
+			checkResults["nudging"] = await checkNudging(rejectButtonElement, acceptButtonElement);
 		}
 	}
-	/*if (mobileBanner) {
-		const textAndTypeMobile = await getTextAndType(mobileBanner);
-	}*/
-
-	// TODO: Check if desktop and mobile banner are identical, if so, do the text analysis only once.
-
-	await desktopPage.close();
-	await mobilePage.close();
-
-	return results;
+	return checkResults;
 }
 
+async function checkNudging(
+	rejectButtonElement: { id?: number; tag?: string; text?: string; element: any },
+	acceptButtonElement: { id?: number; tag?: string; text?: string; element: any },
+) {
+	const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
+	const acceptButtonDOMElement = await desktopPage.$(acceptButtonElement.element);
+
+	let result = "skipped";
+
+	if (rejectButtonDOMElement && acceptButtonDOMElement) {
+		result = "pass";
+
+		type StyleProperties = {
+			background: string;
+			color: string;
+			fontSize: string;
+			fontWeight: string;
+			fontFamily: string;
+			opacity: string;
+		};
+
+		const propertyList: (keyof StyleProperties)[] = [
+			"background",
+			"color",
+			"fontSize",
+			"fontWeight",
+			"fontFamily",
+			"opacity",
+		];
+
+		const rejectButtonStyle = await rejectButtonDOMElement.evaluate((el, propertyList) => {
+			const style = getComputedStyle(el);
+			const styleObject: StyleProperties = {
+				background: "",
+				color: "",
+				fontSize: "",
+				fontWeight: "",
+				fontFamily: "",
+				opacity: "",
+			};
+
+			for (const property of propertyList) {
+				styleObject[property] = style.getPropertyValue(property);
+			}
+			return styleObject;
+		}, propertyList);
+
+		const acceptButtonStyle = await acceptButtonDOMElement.evaluate((el, propertyList) => {
+			const style = getComputedStyle(el);
+			const styleObject: StyleProperties = {
+				background: "",
+				color: "",
+				fontSize: "",
+				fontWeight: "",
+				fontFamily: "",
+				opacity: "",
+			};
+
+			for (const property of propertyList) {
+				styleObject[property] = style.getPropertyValue(property);
+			}
+			return styleObject;
+		}, propertyList);
+
+		console.log(JSON.stringify(rejectButtonStyle));
+		console.log(JSON.stringify(acceptButtonStyle));
+
+		if (rejectButtonStyle !== acceptButtonStyle) {
+			result = "warning";
+		}
+	}
+	return result;
+}
+
+/**
+ * Sends a request to the OpenAI Chat API.
+ * @async
+ * @param {string} system - System message for the Chat API.
+ * @param {string} input - User message for the Chat API.
+ * @param {number} maxOutputTokens - Maximum number of tokens for the API response.
+ * @returns {Promise<Object>} The message object from the API response.
+ */
 async function sendChatAPIRequest(system: string, input: string, maxOutputTokens: number) {
 	const completion = await openai.createChatCompletion({
 		model: "gpt-3.5-turbo",
@@ -300,16 +279,32 @@ async function sendChatAPIRequest(system: string, input: string, maxOutputTokens
 	return completion.data.choices[0].message;
 }
 
+/**
+ * Calculates the number of tokens in a given text string.
+ * @param {string} text - The input text.
+ * @returns {number} The number of tokens in the input text.
+ */
 function calculateTokens(text: string): number {
 	const encoded = encode(text);
 
 	return encoded.length;
 }
 
+/**
+ * Calculates the maximum number of tokens that can be sent as input to the Chat API.
+ * @returns {number} The maximum number of input tokens.
+ */
 function calculateInputMaxTokens(): number {
 	return apiTotalTokenLimit - calculateTokens(systemPrompt) - longestPossibleOutput;
 }
 
+/**
+ * Calculates the percentage of the viewport area occupied by the cookie banner.
+ * @async
+ * @param {ElementHandle} banner - The ElementHandle representing the cookie banner.
+ * @param {Page} page - The Puppeteer Page object.
+ * @returns {Promise<number>} The percentage of the viewport area occupied by the cookie banner.
+ */
 async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promise<number> {
 	const boundingBox = await banner.boundingBox();
 	const boundingBoxArea =
@@ -321,61 +316,55 @@ async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promi
 	return (boundingBoxArea / viewportArea) * 100;
 }
 
+/**
+ * Extracts text and type information and a selector from the given element.
+ * @async
+ * @param {ElementHandle} element - The ElementHandle representing the element to extract information from.
+ * @returns {Promise<Object>} An object containing elementList and chunks.
+ */
 async function getTextAndType(element: ElementHandle): Promise<{
-	elementList: { id: number; tag: string; text: string; element: ElementHandle<Element> }[];
+	elementList: { id: number; tag: string; text: string; element: string }[];
 	chunks: string[];
 }> {
 	const semanticTags = ["a", "button", "input", "select", "textarea"];
-	console.log("starting tt");
-	/*const textAndType = await element.evaluate(async (el, semanticTags) => {
-		async function traverse(
-			node: Node,
-			result: [string, string, HTMLElement][],
-			semanticTags: string[],
-		): Promise<([string, string, HTMLElement] | null)[]> {
-			const nodeElement = node as HTMLElement;
-			if (node.nodeType === Node.TEXT_NODE) {
-				const text = node.textContent?.trim();
-				if (text) {
-					result.push(["p", text.replace(/\s+/g, " ").trim(), nodeElement]);
-				}
-			} else if (node.nodeType === Node.ELEMENT_NODE) {
-				const tagName = nodeElement.tagName.toLowerCase();
-
-				if (semanticTags.includes(tagName)) {
-					result.push([tagName, nodeElement.textContent?.replace(/\s+/g, " ").trim() || "", nodeElement]);
-				}
-
-				for (const child of Array.from(nodeElement.childNodes)) {
-					await traverse(child, result, semanticTags);
-				}
-			}
-
-			return result;
-		}
-		return await traverse(el, [], semanticTags);
-	}, semanticTags);*/
 
 	async function traverse(
 		node: ElementHandle<Element>,
-		result: [string, string, ElementHandle<Element>][],
+		result: [string, string, string][],
 		semanticTags: string[],
-	): Promise<([string, string, ElementHandle<Element>] | null)[]> {
+	): Promise<([string, string, string] | null)[]> {
 		const nodeType = await node.evaluate((el) => el.nodeType);
 		const textNodeType = await node.evaluate(() => Node.TEXT_NODE);
 		const elementNodeType = await node.evaluate(() => Node.ELEMENT_NODE);
 
-		console.log("test");
 		if (nodeType === textNodeType) {
 			const text = await node.evaluate((el) => el.textContent?.trim());
 			if (text) {
-				result.push(["p", text.replace(/\s+/g, " ").trim(), node]);
+				const nearestElement = await node.evaluateHandle((textNode) => {
+					let currentNode = textNode.parentNode;
+					while (currentNode && currentNode.nodeType !== Node.ELEMENT_NODE) {
+						currentNode = currentNode.parentNode;
+					}
+					return currentNode;
+				});
+
+				const nearestElementHandle = nearestElement as ElementHandle<HTMLElement>;
+				const tagName = await nearestElementHandle.evaluate((el) => el.tagName.toLowerCase());
+				result.push([
+					tagName,
+					text.replace(/\s+/g, " ").trim(),
+					await getUniqueCssSelector(nearestElementHandle, desktopPage),
+				]);
 			}
 		} else if (nodeType === elementNodeType) {
 			const tagName = await node.evaluate((el) => el.tagName.toLowerCase());
 			if (semanticTags.includes(tagName)) {
 				const textContent = await node.evaluate((el) => el.textContent?.replace(/\s+/g, " ").trim() || "");
-				result.push([tagName, textContent, node]);
+				result.push([
+					tagName,
+					textContent,
+					await getUniqueCssSelector(node as ElementHandle<HTMLElement>, desktopPage),
+				]);
 			}
 
 			const childNodes = await node.evaluateHandle((el) => Array.from(el.childNodes));
@@ -389,19 +378,25 @@ async function getTextAndType(element: ElementHandle): Promise<{
 
 		return result;
 	}
-	console.log("starting traverse");
+
 	const textAndType = await traverse(element, [], semanticTags);
 
 	const duplicates = findDuplicates(textAndType, semanticTags);
-
 	removeDuplicates(textAndType, duplicates);
 
 	return buildFinalElementList(textAndType);
 }
 
-function findDuplicates(textAndType: ([string, string, ElementHandle<Element>] | null)[], semanticTags: string[]) {
+/**
+ * Finds duplicates in the text and type array.
+ * @param {Array} textAndType - An array of text and type tuples.
+ * @param {Array} semanticTags - An array of semantic HTML tags.
+ * @returns {Array} An array of duplicates.
+ */
+function findDuplicates(textAndType: ([string, string, string] | null)[], semanticTags: string[]) {
 	const duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[] = [];
 
+	const removables: number[] = [];
 	textAndType.forEach((currentElement, i) => {
 		const setOfDuplicates: { tag: string; index: number }[] = [];
 
@@ -410,19 +405,27 @@ function findDuplicates(textAndType: ([string, string, ElementHandle<Element>] |
 
 			if (currentElement != null && compareElement != null && currentElement[1] === compareElement[1]) {
 				setOfDuplicates.push({ tag: compareElement[0], index: l });
+				removables.push(l);
 			}
 		});
 
 		if (currentElement != null && setOfDuplicates.length > 0 && semanticTags.includes(currentElement[0])) {
-			duplicates.push({ tag: currentElement[0], index: i, duplicates: setOfDuplicates });
+			if (!removables.includes(i)) {
+				duplicates.push({ tag: currentElement[0], index: i, duplicates: setOfDuplicates });
+			}
 		}
 	});
 
 	return duplicates;
 }
 
+/**
+ * Removes duplicates from the text and type array.
+ * @param {Array} textAndType - An array of text and type tuples.
+ * @param {Array} duplicates - An array of duplicates to be removed.
+ */
 function removeDuplicates(
-	textAndType: ([string, string, ElementHandle<Element>] | null)[],
+	textAndType: ([string, string, string] | null)[],
 	duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[],
 ) {
 	for (const duplicate of duplicates) {
@@ -432,21 +435,23 @@ function removeDuplicates(
 	}
 }
 
-function buildFinalElementList(textAndType: ([string, string, ElementHandle<Element>] | null)[]): {
-	elementList: { id: number; tag: string; text: string; element: ElementHandle<Element> }[];
+/**
+ * Builds the final element list from the text and type array.
+ * @param {Array} textAndType - An array of text and type tuples.
+ * @returns {Object} An object containing the elementList and chunks.
+ */
+function buildFinalElementList(textAndType: ([string, string, string] | null)[]): {
+	elementList: { id: number; tag: string; text: string; element: string }[];
 	chunks: string[];
 } {
 	const finalTexts = [];
 	let count = 0;
 	const chunkMaxTokenSize = calculateInputMaxTokens();
-	console.log(`Chunk's Max Token size is ${chunkMaxTokenSize}`);
 	const chunks = [];
 	let currentChunk = "";
 
 	for (const tType of textAndType) {
 		if (tType) {
-			console.log(tType[2]);
-			console.log(typeof tType[2]);
 			finalTexts.push({ id: count, tag: tType[0], text: tType[1], element: tType[2] });
 			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
 			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
@@ -460,7 +465,6 @@ function buildFinalElementList(textAndType: ([string, string, ElementHandle<Elem
 
 	chunks.push(currentChunk); // Last chunk addition.
 
-	// TODO: The finalText is too simple rn. Should chunk it simultaneously to control prompt size.
 	return { elementList: finalTexts, chunks: chunks };
 }
 
@@ -473,6 +477,12 @@ interface Result {
 	"implied-consent": boolean;
 }
 
+/**
+ * Merges multiple GPT results (in case of chunking) into a single result object.
+ * @param {Array} results - An array of result objects.
+ * @param {Array} inputSizes - An array of input sizes corresponding to the results.
+ * @returns {Result} A merged result object.
+ */
 function mergeResults(results: Result[], inputSizes: number[]): Result {
 	const finalResult: Result = {
 		"legal-jargon": false,
