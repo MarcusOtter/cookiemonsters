@@ -9,6 +9,8 @@ import type { ElementHandle, Page } from "puppeteer";
 import { encode } from "gpt-3-encoder";
 import { OPENAI_API_KEY } from "$env/static/private";
 import { Configuration, OpenAIApi } from "openai";
+import type CheckResult from "$lib/utils/CheckResult";
+import { findCheckResult } from "$lib/utils/findCheckResult";
 const configuration = new Configuration({
 	apiKey: OPENAI_API_KEY,
 });
@@ -31,6 +33,7 @@ Here are some examples of Reject All buttons:
 {ID}-button: "Reject"
 {ID}-a: "Kiellä"
 {ID}-button: "Only allow essential cookies"
+{ID}-button: "Decline optional cookies"
 Buttons to "manage settings" etc are NOT considered Reject All -buttons.
 
 5. Determine which clickable element is used to ACCEPT ALL cookies.
@@ -134,53 +137,232 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
  * @param {string} selector - CSS selector to find the cookie banner.
  * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
  */
-async function analyzeBanner(selector: string): Promise<object> {
-	const checkResults = { "reject-button": "not found", nudging: "skipped", "banner-size": 0 };
+async function analyzeBanner(selector: string): Promise<CheckResult[] | null> {
+	const analysisResults: CheckResult[] = [
+		{
+			id: "banner-size",
+			name: "Banner Size",
+			description: "",
+			category: "Design",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		},
+		{
+			id: "reject-button-layer",
+			name: "Reject Button Layer",
+			description: "Checks whether a button to reject all cookies exists and how difficult it is to get to.",
+			category: "Functionality",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "nudging",
+			name: "Nudging",
+			description: "",
+			category: "Design",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "blocking",
+			name: "Blocking",
+			description: "",
+			category: "Design",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "clarity",
+			name: "Text Clarity",
+			description: "Checks whether the text does not contain legal jargon and that it is generally clear.",
+			category: "Information",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "language-consistency",
+			name: "Language Consistency",
+			description: "Checks whether the cookie banner's language is the same as the page's.",
+			category: "Accessibility",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "purpose",
+			name: "Cookie Purpose",
+			description: "Checks whether cookies' purpose is described clearly.",
+			category: "Information",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "implied-consent",
+			name: "Implied Consent",
+			description: "Checks that the cookie banner doesn't assume implied consent.",
+			category: "Functionality",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "color-contrast",
+			name: "Color Contrast",
+			description: "Checks that the cookie banner follows accessibility standards in color contrast.",
+			category: "Accessibility",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "choices-respected",
+			name: "Choices Respected",
+			description: "Checks that the user's consent choices are respected after declining consent.",
+			category: "Functionality",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+		{
+			id: "cookies-before-consent",
+			name: "Cookies Before Consent",
+			description: "Checks whether cookies are set before consent is obtained from the website’s user.",
+			category: "Functionality",
+			status: "Undefined",
+			resultSummary: "",
+			details: null,
+		} as CheckResult,
+	];
+	// const checkResults = { "reject-button": "", nudging: "skipped", "banner-size": 0, "jargon": null, "language": "" };
+
+	/*
+	
+	TODO:
+	- reword implied consent prompt
+	- cookies-before-consent from other branch
+	- color-contrast
+	- choices-respected
+	- blocking check
+	- language
+
+	*/
 
 	const desktopBanner = await desktopPage.$(selector);
+	if (!desktopBanner) {
+		return null;
+	}
 
-	checkResults["banner-size"] = desktopBanner ? await getBannerAreaPercentage(desktopBanner, desktopPage) : 0;
+	const bannerSizePercentage = desktopBanner ? await getBannerAreaPercentage(desktopBanner, desktopPage) : 0;
+	const bannerSizeCheckResult = findCheckResult(analysisResults, "banner-size");
 
-	if (desktopBanner) {
-		const textAndTypeDesktop = await getTextAndType(desktopBanner);
+	bannerSizeCheckResult.resultSummary = `The cookie banner takes up ${Math.round(
+		bannerSizePercentage,
+	)}% of the screen.`;
+	if (Math.round(bannerSizePercentage) >= 25) {
+		bannerSizeCheckResult.status = "Warning";
+	} else {
+		bannerSizeCheckResult.status = "Pass";
+	}
 
-		const results = [];
-		const chunkSizes = [];
+	const textAndTypeDesktop = await getTextAndType(desktopBanner);
 
-		for (const chunk of textAndTypeDesktop["chunks"]) {
-			const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
-			if (gptResult) {
-				chunkSizes.push(calculateTokens(chunk));
-				results.push(JSON.parse(gptResult.content));
-			}
-		}
+	const results = [];
+	const chunkSizes = [];
 
-		const gptResultMerged = mergeResults(results, chunkSizes);
-		console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
-
-		const acceptButtonElement = textAndTypeDesktop.elementList.find(
-			(element) => element.id == gptResultMerged["accept-btn"],
-		);
-		const rejectButtonElement = textAndTypeDesktop.elementList.find(
-			(element) => element.id == gptResultMerged["reject-btn"],
-		);
-
-		if (rejectButtonElement) {
-			console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.element)}`);
-
-			checkResults["reject-button"] = "found";
-
-			const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
-			if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
-				checkResults["reject-button"] = "in viewport";
-			}
-		}
-
-		if (rejectButtonElement && acceptButtonElement) {
-			checkResults["nudging"] = await checkNudging(rejectButtonElement, acceptButtonElement);
+	for (const chunk of textAndTypeDesktop["chunks"]) {
+		const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
+		if (gptResult) {
+			chunkSizes.push(calculateTokens(chunk));
+			results.push(JSON.parse(gptResult.content));
 		}
 	}
-	return checkResults;
+
+	const gptResultMerged = mergeResults(results, chunkSizes);
+	console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
+
+	const textClarityCheckResult = findCheckResult(analysisResults, "clarity");
+
+	if (gptResultMerged["legal-jargon"]) {
+		textClarityCheckResult.resultSummary = `The cookie banner seems to contain legal jargon or unclear text.`;
+		textClarityCheckResult.status = "Warning";
+	} else {
+		textClarityCheckResult.resultSummary = `The cookie banner seems to have clear text and does not contain legal jargon.`;
+		textClarityCheckResult.status = "Pass";
+	}
+
+	const purposeCheckResult = findCheckResult(analysisResults, "purpose");
+
+	if (gptResultMerged["purpose-described"]) {
+		purposeCheckResult.resultSummary = `The cookie banner seems to describe the purpose of the cookies clearly.`;
+		purposeCheckResult.status = "Pass";
+	} else {
+		purposeCheckResult.resultSummary = `The cookie banner does not seem to describe the purpose of the cookies.`;
+		purposeCheckResult.status = "Warning";
+	}
+
+	const impliedConsentCheckResult = findCheckResult(analysisResults, "implied-consent");
+
+	if (gptResultMerged["implied-consent"]) {
+		impliedConsentCheckResult.resultSummary = `The cookie banner contains wording that suggests that the user has no say in consent i.e. Implied consent.`;
+		impliedConsentCheckResult.status = "Fail";
+	} else {
+		impliedConsentCheckResult.resultSummary = `The cookie banner does not seem contain wording of implied consent.`;
+		impliedConsentCheckResult.status = "Pass";
+	}
+
+	// checkResults["language"] = gptResultMerged["lang"]; // TODO: Check language of a portion of the page and compare gpt results.
+
+	const acceptButtonElement = textAndTypeDesktop.elementList.find(
+		(element) => element.id == gptResultMerged["accept-btn"],
+	);
+	const rejectButtonElement = textAndTypeDesktop.elementList.find(
+		(element) => element.id == gptResultMerged["reject-btn"],
+	);
+
+	const rejectButtonLayerCheckResult = findCheckResult(analysisResults, "reject-button-layer");
+
+	if (rejectButtonElement) {
+		console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.element)}`);
+
+		rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found within the cookie banner, but not on the first layer.`;
+		rejectButtonLayerCheckResult.status = "Warning";
+
+		const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
+
+		if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
+			rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found on the first layer of the cookie banner.`;
+			rejectButtonLayerCheckResult.status = "Pass";
+		}
+	} else {
+		rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was not found within the cookie banner.`;
+		rejectButtonLayerCheckResult.status = "Fail";
+	}
+
+	const nudgingCheckResult = findCheckResult(analysisResults, "nudging");
+
+	nudgingCheckResult.resultSummary = `This check was skipped due to the accept/decline button missing or being on different layers.`;
+	nudgingCheckResult.status = "Skipped";
+
+	if (rejectButtonElement && acceptButtonElement && rejectButtonLayerCheckResult.status == "Pass") {
+		// Reject Pass check so that it isn't on another layer.
+		const nudgingCheck = await checkNudging(rejectButtonElement, acceptButtonElement);
+		if (nudgingCheck == "pass") {
+			nudgingCheckResult.resultSummary = "The cookie banner does not nudge the user's consent decision by design.";
+			nudgingCheckResult.status = "Pass";
+		} else if (nudgingCheck == "warning") {
+			nudgingCheckResult.resultSummary =
+				"The cookie banner seems to nudge the user's consent decision by differentiating the styling of the accept/decline buttons.";
+			nudgingCheckResult.status = "Warning";
+		}
+	}
+
+	return analysisResults;
 }
 
 async function checkNudging(
@@ -193,7 +375,7 @@ async function checkNudging(
 	let result = "skipped";
 
 	if (rejectButtonDOMElement && acceptButtonDOMElement) {
-		result = "pass";
+		result = "warning";
 
 		type StyleProperties = {
 			background: string;
@@ -250,8 +432,8 @@ async function checkNudging(
 		console.log(JSON.stringify(rejectButtonStyle));
 		console.log(JSON.stringify(acceptButtonStyle));
 
-		if (rejectButtonStyle !== acceptButtonStyle) {
-			result = "warning";
+		if (JSON.stringify(rejectButtonStyle) === JSON.stringify(acceptButtonStyle)) {
+			result = "pass";
 		}
 	}
 	return result;
@@ -452,6 +634,7 @@ function buildFinalElementList(textAndType: ([string, string, string] | null)[])
 
 	for (const tType of textAndType) {
 		if (tType) {
+			console.log(`id: ${count}, text: ${tType[1]} , selector: ${tType[2]}`);
 			finalTexts.push({ id: count, tag: tType[0], text: tType[1], element: tType[2] });
 			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
 			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
