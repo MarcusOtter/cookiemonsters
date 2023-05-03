@@ -49,19 +49,19 @@ export async function getUniqueCssSelector(element: ElementHandle<HTMLElement>, 
 		}
 
 		function buildSelector(node: HTMLElement): string {
-			const selector = node.tagName.toLowerCase();
+			let selector = node.tagName.toLowerCase();
 
 			if (node.id) {
-				const idSelector = `${selector}#${CSS.escape(node.id)}`;
-				if (isUniqueSelector(idSelector)) {
-					return idSelector;
+				selector = `${selector}#${CSS.escape(node.id)}`;
+				if (isUniqueSelector(selector)) {
+					return selector;
 				}
 			}
 
 			if (node.classList.length > 0) {
-				const classSelector = `${selector}.${[...node.classList].map((c) => CSS.escape(c)).join(".")}`;
-				if (isUniqueSelector(classSelector)) {
-					return classSelector;
+				selector = `${selector}.${[...node.classList].map((c) => CSS.escape(c)).join(".")}`;
+				if (isUniqueSelector(selector)) {
+					return selector;
 				}
 			}
 

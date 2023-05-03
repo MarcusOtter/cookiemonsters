@@ -66,6 +66,7 @@
 		padding: 32px 64px;
 		background: linear-gradient(180deg, hsl(231, 9%, 15%), hsl(228, 10%, 10%));
 		text-align: center;
+		border: 2px solid hsla(0, 0%, 100%, 0.05);
 	}
 
 	label {
