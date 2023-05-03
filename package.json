@@ -30,7 +30,10 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"csv": "^6.2.10",
-		"puppeteer": "^18.1.0"
+		"gpt-3-encoder": "^1.1.4",
+		"openai": "^3.2.1",
+		"puppeteer": "^18.1.0",
+		"sqlite": "^4.1.2",
+		"sqlite3": "^5.1.6"
 	}
 }

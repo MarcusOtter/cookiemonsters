@@ -1,13 +1,11 @@
-import ViewportFindResult from "$lib/ViewportFindResult";
 import type { ElementHandle, Page } from "puppeteer";
 import type BannerFinder from "./BannerFinder";
-import { getElementOpeningTag, getElementsWithWords, getViewportSize, screenshotAsBase64 } from "../puppeteerHelpers";
+import { getElementOpeningTag, getElementsWithWords, getUniqueCssSelector } from "../puppeteerHelpers";
 import { getUniqueCommonPhrases } from "../getCommonPhrases";
 
+// TODO: Needs a big refactor.
 export default class MarcusUltraFinder implements BannerFinder {
-	async findBanner(page: Page): Promise<ViewportFindResult> {
-		const startTime = performance.now();
-
+	async findBannerSelector(page: Page): Promise<string> {
 		console.log("##### MARCUS ULTRA START #####");
 
 		/*
@@ -26,7 +24,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 		const elements = await getElementsWithWords(page, keywords, { includeChildren: true });
 
 		// Pick the element with the largest z-index
-		let bestElements: ElementHandle<HTMLElement>[] = [];
+		let bestElements: ElementHandle<Element>[] = [];
 		let highestZIndex = -Infinity;
 		for (const element of elements) {
 			const zIndex = await element.evaluate((el) => {
@@ -52,7 +50,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 		console.log("Best elements length:", bestElements.length);
 
 		let bestElement = undefined;
-		// If there is a tie, pick the element with a fully opaque background color
+		// If there is a tie, pick the element with a fully opaque background color (broken for youtube.com on mobile)
 		if (bestElements.length === 1) {
 			bestElement = bestElements[0];
 		} else {
@@ -75,9 +73,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 			}
 		}
 
-		async function searchForOpaqueElement(
-			element: ElementHandle<HTMLElement>,
-		): Promise<ElementHandle<HTMLElement> | null> {
+		async function searchForOpaqueElement(element: ElementHandle<Element>): Promise<ElementHandle<Element> | null> {
 			const currentIsOpaque = await element.evaluate((el) => {
 				const backgroundColor = window.getComputedStyle(el).getPropertyValue("background-color");
 				const backgroundImage = window.getComputedStyle(el).getPropertyValue("background-image");
@@ -169,12 +165,7 @@ export default class MarcusUltraFinder implements BannerFinder {
 			console.log("The best element is", await getElementOpeningTag(bestElement));
 		}
 
-		const screenshot = await screenshotAsBase64(bestElement ?? page);
-		return new ViewportFindResult(
-			bestElement != undefined,
-			getViewportSize(page),
-			screenshot,
-			performance.now() - startTime,
-		);
+		const selector = bestElement ? await getUniqueCssSelector(bestElement as ElementHandle<HTMLElement>, page) : "";
+		return selector;
 	}
 }
