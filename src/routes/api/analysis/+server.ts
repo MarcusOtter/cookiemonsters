@@ -12,6 +12,9 @@ import { Configuration, OpenAIApi } from "openai";
 import type CheckResult from "$lib/utils/CheckResult";
 import { findCheckResult } from "$lib/utils/findCheckResult";
 import type { CookieResult } from "$lib/CookieResult";
+import Color from "color";
+import WCAG from "wcag-contrast";
+
 const configuration = new Configuration({
 	apiKey: OPENAI_API_KEY,
 });
@@ -280,12 +283,92 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 		bannerSizeCheckResult.status = "Pass";
 	}
 
-	const textAndTypeDesktop = await getTextAndType(desktopBanner);
+	//const textAndTypeDesktop = await getTextAndType(desktopBanner);
+
+	const cookieBannerTextElements = await getCookieBannerTextElements(selector, desktopPage);
+	console.log(JSON.stringify(cookieBannerTextElements));
+
+	/*for (const element of elementList) {
+		const elementSelector = element.element;
+		const domElement = await desktopBanner.$(elementSelector);
+
+		if (domElement) {
+			const style = await domElement.evaluate((el) => {
+				const style = getComputedStyle(el);
+				const color = style.getPropertyValue("color");
+				const backgroundColor = style.getPropertyValue("background-color");
+				return { color, backgroundColor };
+			});
+
+			if (style.color && style.backgroundColor && style.backgroundColor != "rgba(0, 0, 0, 0)") {
+				const hexColor = convertToHex(style.color);
+				const hexBgColor = convertToHex(style.backgroundColor);
+				const contrast = WCAG.hex(hexColor, hexBgColor);
+
+				console.log(`Checking element ${element.element} with text: ${element.text}`);
+				console.log(`Contrast between ${hexColor} and ${hexBgColor} is ${contrast}`);
+				// TODO: Calculate contrast between element's own color and background. DONE
+				// TODO: Compare the element's background to the ancestor's background.
+
+				const ancestor = await findAncestorWithBackgroundColor(domElement);
+				// TODO: What to do if ancestor is null?
+				if (ancestor) {
+					const ancestorStyle = await ancestor.evaluate((el) => {
+						const style = getComputedStyle(el);
+						const backgroundColor = style.getPropertyValue("background-color");
+						return { backgroundColor };
+					});
+
+					const ancestorHexBgColor = convertToHex(ancestorStyle.backgroundColor);
+					const ancestorContrast = WCAG.hex(hexColor, ancestorHexBgColor);
+
+					console.log(`Checking element ${element.element} with text: ${element.text}`);
+					console.log(`Contrast between ${hexColor} and ancestor ${ancestorHexBgColor} is ${ancestorContrast}`);
+				}
+			}
+
+			if (style.color && (!style.backgroundColor || style.backgroundColor == "rgba(0, 0, 0, 0)")) {
+				const ancestor = await findAncestorWithBackgroundColor(domElement);
+				// TODO: What to do if ancestor is null?
+				if (ancestor) {
+					const ancestorStyle = await ancestor.evaluate((el) => {
+						const style = getComputedStyle(el);
+						const backgroundColor = style.getPropertyValue("background-color");
+						return { backgroundColor };
+					});
+
+					const hexColor = convertToHex(style.color);
+					const hexBgColor = convertToHex(ancestorStyle.backgroundColor);
+					const contrast = WCAG.hex(hexColor, hexBgColor);
+
+					console.log(`Checking element ${element.element} with text: ${element.text}`);
+					console.log(`Contrast between ${hexColor} and ancestor ${hexBgColor} is ${contrast}`);
+				}
+				// TODO: Compare the text color to the ancestor's background. DONE
+			}
+		}
+	}*/
+
+	const chunkMaxTokenSize = calculateInputMaxTokens();
+	const chunks = [];
+	let currentChunk = "";
+
+	for (const element of cookieBannerTextElements) {
+		const elementText = `${element.index}-${element.tag}:"${element.text}", `;
+		if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
+			chunks.push(currentChunk);
+			currentChunk = "";
+		}
+		currentChunk += elementText;
+	}
+
+	chunks.push(currentChunk); // Last chunk addition.
 
 	const results = [];
 	const chunkSizes = [];
 
-	for (const chunk of textAndTypeDesktop["chunks"]) {
+	for (const chunk of chunks) {
+		console.log(chunk);
 		const gptResult = await sendChatAPIRequest(systemPrompt, chunk, longestPossibleOutput);
 		if (gptResult) {
 			chunkSizes.push(calculateTokens(chunk));
@@ -335,22 +418,22 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 		languageCheckResult.status = "Fail";
 	}
 
-	const acceptButtonElement = textAndTypeDesktop.elementList.find(
-		(element) => element.id == gptResultMerged["accept-btn"],
+	const acceptButtonElement = cookieBannerTextElements.find(
+		(element) => element.index == gptResultMerged["accept-btn"],
 	);
-	const rejectButtonElement = textAndTypeDesktop.elementList.find(
-		(element) => element.id == gptResultMerged["reject-btn"],
+	const rejectButtonElement = cookieBannerTextElements.find(
+		(element) => element.index == gptResultMerged["reject-btn"],
 	);
 
 	const rejectButtonLayerCheckResult = findCheckResult(analysisResults, "reject-button-layer");
 
 	if (rejectButtonElement) {
-		console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.element)}`);
+		console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.selector)}`);
 
 		rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found within the cookie banner, but not on the first layer.`;
 		rejectButtonLayerCheckResult.status = "Warning";
 
-		const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
+		const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.selector);
 
 		if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
 			rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found on the first layer of the cookie banner.`;
@@ -380,6 +463,18 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 	}
 
 	return analysisResults;
+}
+
+function convertToHex(colorString: string): string {
+	const color = Color(colorString);
+	const rgba = color.rgb().array();
+	const hex = color.hex();
+	const hasAlpha = colorString.toLowerCase().includes("rgba");
+	if (hasAlpha) {
+		const alpha = hasAlpha && rgba[3] !== undefined ? (rgba[3] * 255).toString(16) : "";
+		return hex + alpha.padStart(2, "0");
+	}
+	return hex;
 }
 
 async function checkLanguageDifference(bannerLanguage: string, selector: string): Promise<boolean> {
@@ -490,11 +585,23 @@ async function getCookiesBeforeConsent(
 }
 
 async function checkNudging(
-	rejectButtonElement: { id?: number; tag?: string; text?: string; element: any },
-	acceptButtonElement: { id?: number; tag?: string; text?: string; element: any },
+	rejectButtonElement: {
+		index?: number;
+		tag?: string;
+		text?: string;
+		element: ElementHandle<Element>;
+		selector: string;
+	},
+	acceptButtonElement: {
+		index?: number;
+		tag?: string;
+		text?: string;
+		element: ElementHandle<Element>;
+		selector: string;
+	},
 ) {
-	const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.element);
-	const acceptButtonDOMElement = await desktopPage.$(acceptButtonElement.element);
+	const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.selector);
+	const acceptButtonDOMElement = await desktopPage.$(acceptButtonElement.selector);
 
 	let result = "skipped";
 
@@ -622,156 +729,76 @@ async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promi
 	return (boundingBoxArea / viewportArea) * 100;
 }
 
-/**
- * Extracts text and type information and a selector from the given element.
- * @async
- * @param {ElementHandle} element - The ElementHandle representing the element to extract information from.
- * @returns {Promise<Object>} An object containing elementList and chunks.
- */
-async function getTextAndType(element: ElementHandle): Promise<{
-	elementList: { id: number; tag: string; text: string; element: string }[];
-	chunks: string[];
-}> {
-	const semanticTags = ["a", "button", "input", "select", "textarea"];
+async function getCookieBannerTextElements(
+	bannerSelector: string,
+	page: Page,
+): Promise<{ index: number; tag: string; text: string; element: ElementHandle<Element>; selector: string }[]> {
+	// Define relevant CSS selectors to find elements containing text
+	const selectors = ["button", "a", "p", "span", "li"];
 
-	async function traverse(
-		node: ElementHandle<Element>,
-		result: [string, string, string][],
-		semanticTags: string[],
-	): Promise<([string, string, string] | null)[]> {
-		const nodeType = await node.evaluate((el) => el.nodeType);
-		const textNodeType = await node.evaluate(() => Node.TEXT_NODE);
-		const elementNodeType = await node.evaluate(() => Node.ELEMENT_NODE);
+	const selector = selectors.join(",");
 
-		if (nodeType === textNodeType) {
-			const text = await node.evaluate((el) => el.textContent?.trim());
-			if (text) {
-				const nearestElement = await node.evaluateHandle((textNode) => {
-					let currentNode = textNode.parentNode;
-					while (currentNode && currentNode.nodeType !== Node.ELEMENT_NODE) {
-						currentNode = currentNode.parentNode;
-					}
-					return currentNode;
-				});
+	// Extract text content from the elements
+	const getTextContent = async (element: ElementHandle | null) => {
+		if (!element) return "";
+		return await page.evaluate((el) => (el ? el.textContent?.trim() : "" || ""), element);
+	};
 
-				const nearestElementHandle = nearestElement as ElementHandle<HTMLElement>;
-				const tagName = await nearestElementHandle.evaluate((el) => el.tagName.toLowerCase());
-				result.push([
-					tagName,
-					text.replace(/\s+/g, " ").trim(),
-					await getUniqueCssSelector(nearestElementHandle, desktopPage),
-				]);
+	// Find the closest ancestor element that matches the selector
+	const findAncestor = async (textNode: ElementHandle, selector: string) => {
+		return await page.evaluateHandle(
+			(node, selector) => {
+				const range = document.createRange();
+				range.selectNodeContents(node);
+				let container: Node | null = range.commonAncestorContainer;
+
+				while (container && container.nodeType !== Node.ELEMENT_NODE) {
+					container = container.parentNode;
+				}
+
+				return (container as Element | null)?.closest(selector);
+			},
+			textNode,
+			selector,
+		);
+	};
+
+	// Get the cookie banner's ElementHandle (replace with your own method)
+	const cookieBanner = await page.$(bannerSelector);
+
+	// Get all text nodes within the cookie banner
+	const textNodes = await cookieBanner?.$x(".//text()[normalize-space()]");
+
+	const output: { index: number; tag: string; text: string; element: ElementHandle<Element>; selector: string }[] = [];
+	const seenTexts: Set<string> = new Set();
+	let index = 0;
+
+	if (textNodes) {
+		for (const textNode of textNodes) {
+			const ancestorElement = (await findAncestor(
+				textNode as ElementHandle<Element>,
+				selector,
+			)) as ElementHandle<Element>;
+
+			if (ancestorElement) {
+				const textContent = await getTextContent(ancestorElement);
+
+				if (textContent && !seenTexts.has(textContent)) {
+					seenTexts.add(textContent);
+					output.push({
+						index: index,
+						tag: await ancestorElement.evaluate((el) => el.tagName.toLowerCase()),
+						text: textContent,
+						element: ancestorElement,
+						selector: await getUniqueCssSelector(ancestorElement as ElementHandle<HTMLElement>, desktopPage),
+					});
+					index++;
+				}
 			}
-		} else if (nodeType === elementNodeType) {
-			const tagName = await node.evaluate((el) => el.tagName.toLowerCase());
-			if (semanticTags.includes(tagName)) {
-				const textContent = await node.evaluate((el) => el.textContent?.replace(/\s+/g, " ").trim() || "");
-				result.push([
-					tagName,
-					textContent,
-					await getUniqueCssSelector(node as ElementHandle<HTMLElement>, desktopPage),
-				]);
-			}
-
-			const childNodes = await node.evaluateHandle((el) => Array.from(el.childNodes));
-			const children = await childNodes.getProperties();
-
-			for (const child of children.values()) {
-				const childElement = child as ElementHandle<HTMLElement>;
-				await traverse(childElement, result, semanticTags);
-			}
-		}
-
-		return result;
-	}
-
-	const textAndType = await traverse(element, [], semanticTags);
-
-	const duplicates = findDuplicates(textAndType, semanticTags);
-	removeDuplicates(textAndType, duplicates);
-
-	return buildFinalElementList(textAndType);
-}
-
-/**
- * Finds duplicates in the text and type array.
- * @param {Array} textAndType - An array of text and type tuples.
- * @param {Array} semanticTags - An array of semantic HTML tags.
- * @returns {Array} An array of duplicates.
- */
-function findDuplicates(textAndType: ([string, string, string] | null)[], semanticTags: string[]) {
-	const duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[] = [];
-
-	const removables: number[] = [];
-	textAndType.forEach((currentElement, i) => {
-		const setOfDuplicates: { tag: string; index: number }[] = [];
-
-		textAndType.forEach((compareElement, l) => {
-			if (l === i) return;
-
-			if (currentElement != null && compareElement != null && currentElement[1] === compareElement[1]) {
-				setOfDuplicates.push({ tag: compareElement[0], index: l });
-				removables.push(l);
-			}
-		});
-
-		if (currentElement != null && setOfDuplicates.length > 0 && semanticTags.includes(currentElement[0])) {
-			if (!removables.includes(i)) {
-				duplicates.push({ tag: currentElement[0], index: i, duplicates: setOfDuplicates });
-			}
-		}
-	});
-
-	return duplicates;
-}
-
-/**
- * Removes duplicates from the text and type array.
- * @param {Array} textAndType - An array of text and type tuples.
- * @param {Array} duplicates - An array of duplicates to be removed.
- */
-function removeDuplicates(
-	textAndType: ([string, string, string] | null)[],
-	duplicates: { tag: string; index: number; duplicates: { tag: string; index: number }[] }[],
-) {
-	for (const duplicate of duplicates) {
-		for (const removable of duplicate["duplicates"]) {
-			textAndType[removable["index"]] = null;
-		}
-	}
-}
-
-/**
- * Builds the final element list from the text and type array.
- * @param {Array} textAndType - An array of text and type tuples.
- * @returns {Object} An object containing the elementList and chunks.
- */
-function buildFinalElementList(textAndType: ([string, string, string] | null)[]): {
-	elementList: { id: number; tag: string; text: string; element: string }[];
-	chunks: string[];
-} {
-	const finalTexts = [];
-	let count = 0;
-	const chunkMaxTokenSize = calculateInputMaxTokens();
-	const chunks = [];
-	let currentChunk = "";
-
-	for (const tType of textAndType) {
-		if (tType) {
-			finalTexts.push({ id: count, tag: tType[0], text: tType[1], element: tType[2] });
-			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
-			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
-				chunks.push(currentChunk);
-				currentChunk = "";
-			}
-			currentChunk += elementText;
-			count++;
 		}
 	}
 
-	chunks.push(currentChunk); // Last chunk addition.
-
-	return { elementList: finalTexts, chunks: chunks };
+	return output;
 }
 
 interface Result {
