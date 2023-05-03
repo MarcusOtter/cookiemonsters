@@ -4,6 +4,7 @@ import type BannerSelector from "./BannerSelector";
 
 import insert_cookies from "./sql/insert_cookies.sql?raw";
 import create_tables from "./sql/create_tables.sql?raw";
+import type Cookie from "./Cookie";
 
 export default class Db {
 	private static connection: Database<sqlite3.Database, sqlite3.Statement>;
@@ -43,6 +44,28 @@ export default class Db {
 			selector.createdAtUtc,
 			selector.checksum,
 			selector.text,
+		);
+	}
+
+	/*public async getCookie(options: { cookieName: string }) {
+		return await Db.connection.get<Cookie>(
+			`SELECT * FROM Cookie
+			WHERE name = ? OR (name LIKE '%_' AND ? LIKE name || '%')
+			ORDER BY LENGTH(name) DESC
+			LIMIT 1`,
+			options.cookieName,
+			options.cookieName,
+		);
+	}*/
+
+	public async getCookie(options: { cookieName: string }) {
+		return await Db.connection.get<Cookie>(
+			`SELECT * FROM Cookie
+			WHERE name = ? OR ? GLOB name || '_*'
+			ORDER BY LENGTH(name) DESC
+			LIMIT 1`,
+			options.cookieName,
+			options.cookieName,
 		);
 	}
 

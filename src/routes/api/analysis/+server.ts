@@ -5,12 +5,13 @@ import Db from "$lib/server/db/Db";
 import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
 import { getElementOpeningTag, getViewportSizeIndividually, getUniqueCssSelector } from "$lib/server/puppeteerHelpers";
-import type { ElementHandle, Page } from "puppeteer";
+import type { ElementHandle, Page, Protocol } from "puppeteer";
 import { encode } from "gpt-3-encoder";
 import { OPENAI_API_KEY } from "$env/static/private";
 import { Configuration, OpenAIApi } from "openai";
 import type CheckResult from "$lib/utils/CheckResult";
 import { findCheckResult } from "$lib/utils/findCheckResult";
+import type { CookieResult } from "$lib/CookieResult";
 const configuration = new Configuration({
 	apiKey: OPENAI_API_KEY,
 });
@@ -59,6 +60,10 @@ Provide the output as follows:
 {"legal-jargon": true, "purpose-described": false, "lang": "en", "reject-btn": 3, "accept-btn": 8, "implied-consent": true}
 DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
 
+const languageCheckPrompt = `Your job is to determine what the main language of the user's text is (in ISO 639-1). Please simply provide the language code as the ouput. DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE ISO 639-1 LANGUAGE CODE.
+
+Example output: "en"`;
+
 const apiTotalTokenLimit = 4000;
 const longestPossibleOutput = 50;
 
@@ -82,7 +87,9 @@ export const GET = (async (request): Promise<Response> => {
 	const url = new URL(urlString);
 
 	try {
-		const results = await getResults(url, selector);
+		const database = new Db();
+		await database.init();
+		const results = await getResults(url, selector, database);
 		return new Response(JSON.stringify(results));
 	} catch (e) {
 		// TODO: Do not return the error message to the client for security reasons
@@ -91,7 +98,7 @@ export const GET = (async (request): Promise<Response> => {
 	}
 }) satisfies RequestHandler;
 
-async function getResults(url: URL, selector: string): Promise<unknown[]> {
+async function getResults(url: URL, selector: string, database: Db): Promise<unknown[]> {
 	const results: unknown[] = [];
 
 	// We have two separate pages instead of one that we resize, because according to
@@ -123,7 +130,7 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
 	// 	results.push(analysisResult);
 	// }
 
-	const analysisResults = await analyzeBanner(selector);
+	const analysisResults = await analyzeBanner(selector, database);
 	console.log(JSON.stringify(analysisResults));
 	await desktopPage.close();
 	await mobilePage.close();
@@ -137,7 +144,7 @@ async function getResults(url: URL, selector: string): Promise<unknown[]> {
  * @param {string} selector - CSS selector to find the cookie banner.
  * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
  */
-async function analyzeBanner(selector: string): Promise<CheckResult[] | null> {
+async function analyzeBanner(selector: string, database: Db): Promise<CheckResult[] | null> {
 	const analysisResults: CheckResult[] = [
 		{
 			id: "banner-size",
@@ -239,24 +246,27 @@ async function analyzeBanner(selector: string): Promise<CheckResult[] | null> {
 			details: null,
 		} as CheckResult,
 	];
-	// const checkResults = { "reject-button": "", nudging: "skipped", "banner-size": 0, "jargon": null, "language": "" };
 
 	/*
 	
 	TODO:
 	- reword implied consent prompt
-	- cookies-before-consent from other branch
 	- color-contrast
 	- choices-respected
 	- blocking check
-	- language
-
 	*/
 
+	const cookies = await desktopPage.cookies();
+
 	const desktopBanner = await desktopPage.$(selector);
+
 	if (!desktopBanner) {
-		return null;
+		return null; // TODO: Implement error handling if banner can't be found.
 	}
+
+	let cookiesBeforeConsentCheckResult = findCheckResult(analysisResults, "cookies-before-consent");
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	cookiesBeforeConsentCheckResult = await getCookiesBeforeConsent(cookies, cookiesBeforeConsentCheckResult, database);
 
 	const bannerSizePercentage = desktopBanner ? await getBannerAreaPercentage(desktopBanner, desktopPage) : 0;
 	const bannerSizeCheckResult = findCheckResult(analysisResults, "banner-size");
@@ -316,7 +326,14 @@ async function analyzeBanner(selector: string): Promise<CheckResult[] | null> {
 		impliedConsentCheckResult.status = "Pass";
 	}
 
-	// checkResults["language"] = gptResultMerged["lang"]; // TODO: Check language of a portion of the page and compare gpt results.
+	const languageCheckResult = findCheckResult(analysisResults, "language-consistency");
+	if (await checkLanguageDifference(gptResultMerged["lang"], selector)) {
+		languageCheckResult.resultSummary = "The cookie banner has the same language as the website.";
+		languageCheckResult.status = "Pass";
+	} else {
+		languageCheckResult.resultSummary = "The cookie banner's language is not the same as the website's.";
+		languageCheckResult.status = "Fail";
+	}
 
 	const acceptButtonElement = textAndTypeDesktop.elementList.find(
 		(element) => element.id == gptResultMerged["accept-btn"],
@@ -363,6 +380,113 @@ async function analyzeBanner(selector: string): Promise<CheckResult[] | null> {
 	}
 
 	return analysisResults;
+}
+
+async function checkLanguageDifference(bannerLanguage: string, selector: string): Promise<boolean> {
+	// TODO: Adjust these limits to strike a balance between used credits and enough linguistic information.
+	const charLimit = 50;
+	const numSnippets = 10;
+	const snippets = await extractRandomText(desktopPage, selector, charLimit, numSnippets);
+
+	const pageLanguage = (await sendChatAPIRequest(languageCheckPrompt, snippets.join(" "), 10))?.content;
+
+	return pageLanguage == bannerLanguage;
+}
+
+async function extractRandomText(
+	page: Page,
+	selectorToExclude: string,
+	charLimit: number,
+	numSnippets: number,
+): Promise<string[]> {
+	return await page.$$eval(
+		"*",
+		(elements, excludeSelector, limit, count) => {
+			const textTags = [
+				"p",
+				"h1",
+				"h2",
+				"h3",
+				"h4",
+				"h5",
+				"h6",
+				"span",
+				"li",
+				"a",
+				"strong",
+				"em",
+				"blockquote",
+				"figcaption",
+				"label",
+				"td",
+			];
+			elements = elements.filter(
+				(el) =>
+					textTags.includes(el.tagName.toLowerCase()) &&
+					!el.closest(excludeSelector) &&
+					el.textContent &&
+					el.textContent.trim().length > 0,
+			);
+			const snippets: string[] = [];
+			for (let i = 0; i < count && elements.length > 0; i++) {
+				const randomIndex = Math.floor(Math.random() * elements.length);
+				const randomElement = elements.splice(randomIndex, 1)[0];
+				const text = randomElement.textContent!.trim().substring(0, limit);
+				snippets.push(text.replace(/\s+/g, " ").trim());
+			}
+			return snippets;
+		},
+		selectorToExclude,
+		charLimit,
+		numSnippets,
+	);
+}
+
+async function getCookiesBeforeConsent(
+	cookies: Protocol.Network.Cookie[],
+	cookiesBeforeConsentCheckResult: CheckResult,
+	database: Db,
+): Promise<CheckResult> {
+	const foundCookies: CookieResult[] = [];
+
+	for (const clientCookie of cookies) {
+		const foundClientCookie = <CookieResult>{
+			ClientCookie: clientCookie,
+			CookieObject: undefined,
+		};
+		foundClientCookie.CookieObject = await database.getCookie({ cookieName: clientCookie.name });
+		foundCookies.push(foundClientCookie);
+	}
+
+	const unknownCookies = foundCookies.filter((el) => el.CookieObject == undefined);
+	const knownNecessaryCookies = foundCookies.filter(
+		(el) => el.CookieObject != undefined && el.CookieObject.category == "Functional",
+	);
+	const knownUnnecessaryCookies = foundCookies.filter(
+		(el) => el.CookieObject != undefined && el.CookieObject.category != "Functional",
+	);
+
+	if (knownUnnecessaryCookies.length > 0) {
+		cookiesBeforeConsentCheckResult.resultSummary = `Found ${
+			knownUnnecessaryCookies.length
+		} known unnecessary cookie(s) ${
+			unknownCookies.length > 0 ? `and ${unknownCookies.length} unknown cookie(s) ` : ""
+		}before consent choice.`;
+		cookiesBeforeConsentCheckResult.status = "Fail";
+	} else if (unknownCookies.length > 0) {
+		cookiesBeforeConsentCheckResult.resultSummary = `Found ${unknownCookies.length} unknown cookie(s) before consent choice. The necessity of these cookies should be manually checked.`;
+		cookiesBeforeConsentCheckResult.status = "Warning";
+	} else {
+		if (knownNecessaryCookies.length > 0) {
+			cookiesBeforeConsentCheckResult.resultSummary = `Found ${knownNecessaryCookies.length} cookie(s) before consent choice, but they all are known "Functional" cookies.`;
+		} else {
+			cookiesBeforeConsentCheckResult.resultSummary = "No cookies were set before consent choice.";
+		}
+
+		cookiesBeforeConsentCheckResult.status = "Pass";
+	}
+
+	return cookiesBeforeConsentCheckResult;
 }
 
 async function checkNudging(
@@ -634,7 +758,6 @@ function buildFinalElementList(textAndType: ([string, string, string] | null)[])
 
 	for (const tType of textAndType) {
 		if (tType) {
-			console.log(`id: ${count}, text: ${tType[1]} , selector: ${tType[2]}`);
 			finalTexts.push({ id: count, tag: tType[0], text: tType[1], element: tType[2] });
 			const elementText = `${count}-${tType[0]}:"${tType[1]}", `;
 			if (calculateTokens(currentChunk + elementText) > chunkMaxTokenSize) {
