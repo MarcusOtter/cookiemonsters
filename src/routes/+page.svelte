@@ -3,8 +3,19 @@
 
 	let url = "";
 
-	function goToBanner() {
+	type FormSubmitEvent = Event & { readonly submitter: HTMLElement | null } & {
+		currentTarget: EventTarget & HTMLFormElement;
+	};
+
+	function goToBanner(e: FormSubmitEvent) {
+		const data = new FormData(e.currentTarget);
+		for (const [name, value] of data) {
+			console.log(name, ":", value);
+		}
+		console.log(data);
+		console.log(e.currentTarget);
 		// TODO: Validation on url?
+		// return;
 		window.location.href = `/banner?` + new URLSearchParams({ url });
 	}
 </script>
@@ -20,10 +31,10 @@
 		<p>Learn more on our <a href="/about">about</a> page.</p>
 	</div>
 
-	<form on:submit|preventDefault={goToBanner}>
+	<form on:submit|preventDefault={goToBanner} method="post">
 		<label for="url">Web address (URL)</label>
 		<div class="inputs">
-			<input id="url" bind:value={url} placeholder="https://example.com" required size="22" />
+			<input id="url" name="url" bind:value={url} placeholder="https://example.com" required size="22" />
 			<ResolutionPicker />
 
 			<button>Analyze</button>

@@ -14,14 +14,9 @@
 <div>
 	<Toggle id="resolutionToggle" leftLabel="Desktop" rightLabel="Mobile" on:toggleChange={onToggleChanged} />
 	<ShowMore iconSrc={gear} showLabel="Custom resolution" hideLabel="Hide">
-		<input type="number" size="4" value={isMobile ? "360" : "1920"} max="9999" min="1" required /><span>x</span><input
-			type="number"
-			size="4"
-			value={isMobile ? "640" : "1080"}
-			max="9999"
-			min="1"
-			required
-		/>
+		<input name="width" type="number" size="4" value={isMobile ? "360" : "1920"} max="9999" min="1" required /><span
+			>x</span
+		><input name="height" type="number" size="4" value={isMobile ? "640" : "1080"} max="9999" min="1" required />
 	</ShowMore>
 </div>
 
