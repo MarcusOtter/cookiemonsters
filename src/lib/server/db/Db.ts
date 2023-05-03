@@ -47,17 +47,6 @@ export default class Db {
 		);
 	}
 
-	/*public async getCookie(options: { cookieName: string }) {
-		return await Db.connection.get<Cookie>(
-			`SELECT * FROM Cookie
-			WHERE name = ? OR (name LIKE '%_' AND ? LIKE name || '%')
-			ORDER BY LENGTH(name) DESC
-			LIMIT 1`,
-			options.cookieName,
-			options.cookieName,
-		);
-	}*/
-
 	public async getCookie(options: { cookieName: string }) {
 		return await Db.connection.get<Cookie>(
 			`SELECT * FROM Cookie
