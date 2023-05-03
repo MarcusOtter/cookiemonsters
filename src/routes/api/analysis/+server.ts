@@ -288,9 +288,8 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 	const cookieBannerTextElements = await getCookieBannerTextElements(selector, desktopPage);
 	console.log(JSON.stringify(cookieBannerTextElements));
 
-	/*for (const element of elementList) {
-		const elementSelector = element.element;
-		const domElement = await desktopBanner.$(elementSelector);
+	for (const element of cookieBannerTextElements) {
+		const domElement = element.element; // TODO: potentially implement selectors here for future proofing.
 
 		if (domElement) {
 			const style = await domElement.evaluate((el) => {
@@ -347,7 +346,7 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 				// TODO: Compare the text color to the ancestor's background. DONE
 			}
 		}
-	}*/
+	}
 
 	const chunkMaxTokenSize = calculateInputMaxTokens();
 	const chunks = [];
