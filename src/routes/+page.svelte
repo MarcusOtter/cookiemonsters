@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ResolutionPicker from "$lib/components/ResolutionPicker.svelte";
+
 	let url = "";
 
 	function goToBanner() {
@@ -7,56 +9,99 @@
 	}
 </script>
 
-<h1>Analyze your cookie banner GDPR compliance</h1>
-<p>
-	Lorem ipsum dolor sit, amet consectetur adipisicing elit. Debitis eum sunt corporis dignissimos at aliquam autem
-	excepturi velit recusandae nobis minima, facilis error dolorum aperiam enim ad ipsam voluptatum architecto ipsa
-	delectus quo. Maiores saepe molestias fuga atque animi dolorum nostrum alias nobis
-</p>
-
-<form on:submit|preventDefault={goToBanner}>
-	<label for="url">Web address</label>
-	<div class="inputs">
-		<input id="url" bind:value={url} placeholder="https://example.com" required size="4" />
-		<button>Analyze</button>
+<div class="box">
+	<div class="left">
+		<h1>Let's Analyze Your Cookie Banner's GDPR Compliance</h1>
+		<p>The General Data Protection Regulation (GDPR) applies to all websites with users from the EU.</p>
+		<p>
+			CrumblyConsent automatically analyzes your website's cookie banner within minutes and helps you avoid the most
+			common pitfalls with GDPR compliance.
+		</p>
+		<p>Learn more on our <a href="/about">about</a> page.</p>
 	</div>
-</form>
+
+	<form on:submit|preventDefault={goToBanner}>
+		<label for="url">Web address (URL)</label>
+		<div class="inputs">
+			<input id="url" bind:value={url} placeholder="https://example.com" required size="22" />
+			<ResolutionPicker />
+
+			<button>Analyze</button>
+		</div>
+	</form>
+</div>
 
 <style>
+	.box {
+		display: flex;
+		gap: 64px;
+		margin: auto;
+	}
+
+	.box > * {
+		width: 50%;
+	}
+
 	h1 {
-		margin-block-start: 32px;
-		font-size: 3rem;
+		font-size: 2.5rem;
 	}
 
 	p {
 		margin-block-start: 16px;
 	}
 
+	.left p {
+		font-size: 1.35rem;
+		/* color: hsl(0, 0%, 80%); */
+		font-weight: 400;
+		margin-block-start: 1.5em;
+	}
+
+	a:hover {
+		text-decoration: none;
+	}
+
+	form {
+		border-radius: 16px;
+		padding: 32px 64px;
+		background: linear-gradient(180deg, hsl(231, 9%, 15%), hsl(228, 10%, 10%));
+		text-align: center;
+	}
+
 	label {
 		display: block;
-		margin-block-start: 48px;
-		text-transform: uppercase;
+		font-size: 1.5rem;
+		font-weight: bold;
 	}
 
 	.inputs {
+		margin-top: 8px;
 		display: flex;
 		width: 100%;
 		font-size: 1.25rem;
+		flex-direction: column;
+		align-items: center;
+		gap: 48px;
 	}
 
 	.inputs input {
-		flex: 1;
-		padding: 8px 12px;
-		border: none;
+		padding: 12px;
+		border: 2px solid hsl(217, 97%, 46%);
+		border-radius: 16px;
+		background-color: #17181c;
+		color: white;
+		text-align: center;
+		font-size: 1.5rem;
 	}
 
 	.inputs button {
-		padding: 12px 24px;
-		margin-inline-start: 8px;
+		padding: 16px 48px;
+		border-radius: 16px;
 		text-transform: uppercase;
 		background-color: hsl(217, 97%, 36%);
 		border: none;
 		color: white;
+		width: fit-content;
 	}
 
 	.inputs button:disabled {
@@ -66,5 +111,29 @@
 	.inputs button:not(:disabled):hover {
 		background-color: hsl(217, 97%, 46%);
 		cursor: pointer;
+	}
+
+	@media (max-width: 1200px) {
+		.box {
+			flex-direction: column;
+			max-width: 80ch;
+		}
+
+		.box > * {
+			width: 100%;
+		}
+
+		form {
+			background: transparent;
+			padding: 0;
+		}
+
+		.inputs input {
+			width: 100%;
+		}
+
+		.inputs button {
+			width: 100%;
+		}
 	}
 </style>

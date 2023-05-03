@@ -83,5 +83,6 @@
 
 	select {
 		margin-block-start: 16px;
+		color: black;
 	}
 </style>
