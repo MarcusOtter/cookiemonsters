@@ -2,23 +2,32 @@ import type { RequestHandler } from "./$types";
 import { getDesktopPage, getMobilePage } from "$lib/server/getPage";
 import getErrorMessage from "$lib/utils/getErrorMessage";
 import Db from "$lib/server/db/Db";
-import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
-import { getElementOpeningTag, getViewportSizeIndividually, getUniqueCssSelector } from "$lib/server/puppeteerHelpers";
+import { getUniqueCssSelector } from "$lib/server/puppeteerHelpers";
 import type { ElementHandle, Page, Protocol } from "puppeteer";
 import { encode } from "gpt-3-encoder";
-import { OPENAI_API_KEY } from "$env/static/private";
-import { Configuration, OpenAIApi } from "openai";
-import type CheckResult from "$lib/utils/CheckResult";
-import { findCheckResult } from "$lib/utils/findCheckResult";
-import type { CookieResult } from "$lib/CookieResult";
-import Color from "color";
-import WCAG from "wcag-contrast";
+import { BannerSizeAnalyser, type BannerSizeAnalyserParams } from "$lib/server/analysers/BannerSizeAnalyser";
+import type AnalysisResult from "$lib/utils/AnalysisResult";
+import {
+	RejectButtonLayerAnalyser,
+	type RejectButtonLayerAnalyserParams,
+} from "$lib/server/analysers/RejectButtonLayerAnalyser";
+import {
+	CookiesBeforeConsentAnalyser,
+	type CookiesBeforeConsentAnalyserParams,
+} from "$lib/server/analysers/CookiesBeforeConsentAnalyser";
+import { ColorContrastAnalyser, type ColorContrastAnalyserParams } from "$lib/server/analysers/ColorContrastAnalyser";
+import type { GPTResult } from "$lib/server/GPTResult";
+import { TextClarityAnalyser, type TextClarityAnalyserParams } from "$lib/server/analysers/TextClarityAnalyser";
+import {
+	ImpliedConsentAnalyser,
+	type ImpliedConsentAnalyserParams,
+} from "$lib/server/analysers/ImpliedConsentAnalyser";
+import { PurposeAnalyser, type PurposeAnalyserParams } from "$lib/server/analysers/PurposeAnalyser";
+import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
+import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
+import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 
-const configuration = new Configuration({
-	apiKey: OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
 let desktopPage: Page;
 
 const systemPrompt = `You are a legal assistant and your job is to:
@@ -62,10 +71,6 @@ Note that the input might contain special characters, these can be ignored. Elem
 Provide the output as follows:
 {"legal-jargon": true, "purpose-described": false, "lang": "en", "reject-btn": 3, "accept-btn": 8, "implied-consent": true}
 DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE JSON-OUTPUT.`;
-
-const languageCheckPrompt = `Your job is to determine what the main language of the user's text is (in ISO 639-1). Please simply provide the language code as the ouput. DO NOT OUTPUT ANY EXPLANATION OR NOTES. JUST THE ISO 639-1 LANGUAGE CODE.
-
-Example output: "en"`;
 
 const apiTotalTokenLimit = 4000;
 const longestPossibleOutput = 50;
@@ -147,119 +152,33 @@ async function getResults(url: URL, selector: string, database: Db): Promise<unk
  * @param {string} selector - CSS selector to find the cookie banner.
  * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
  */
-async function analyzeBanner(selector: string, database: Db): Promise<CheckResult[] | null> {
-	const analysisResults: CheckResult[] = [
-		{
-			id: "banner-size",
-			name: "Banner Size",
-			description: "",
-			category: "Design",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		},
-		{
-			id: "reject-button-layer",
-			name: "Reject Button Layer",
-			description: "Checks whether a button to reject all cookies exists and how difficult it is to get to.",
-			category: "Functionality",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "nudging",
-			name: "Nudging",
-			description: "",
-			category: "Design",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "blocking",
-			name: "Blocking",
-			description: "",
-			category: "Design",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "clarity",
-			name: "Text Clarity",
-			description: "Checks whether the text does not contain legal jargon and that it is generally clear.",
-			category: "Information",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "language-consistency",
-			name: "Language Consistency",
-			description: "Checks whether the cookie banner's language is the same as the page's.",
-			category: "Accessibility",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "purpose",
-			name: "Cookie Purpose",
-			description: "Checks whether cookies' purpose is described clearly.",
-			category: "Information",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "implied-consent",
-			name: "Implied Consent",
-			description: "Checks that the cookie banner doesn't assume implied consent.",
-			category: "Functionality",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "color-contrast",
-			name: "Color Contrast",
-			description: "Checks that the cookie banner follows accessibility standards in color contrast.",
-			category: "Accessibility",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "choices-respected",
-			name: "Choices Respected",
-			description: "Checks that the user's consent choices are respected after declining consent.",
-			category: "Functionality",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-		{
-			id: "cookies-before-consent",
-			name: "Cookies Before Consent",
-			description: "Checks whether cookies are set before consent is obtained from the website’s user.",
-			category: "Functionality",
-			status: "Undefined",
-			resultSummary: "",
-			details: null,
-		} as CheckResult,
-	];
+async function analyzeBanner(selector: string, database: Db): Promise<AnalysisResult<any>[] | null> {
+	// TODO: Left to implement are the following:
+	/**
+	 * {
+	 * id: "blocking",
+		name: "Blocking",
+		description: "",
+		category: "Design",
+		status: "Undefined",
+		resultSummary: "",
+		details: "",
+	 * }
+	 * {
+		id: "choices-respected",
+		name: "Choices Respected",
+		description: "Checks that the user's consent choices are respected after declining consent.",
+		category: "Functionality",
+		status: "Undefined",
+		resultSummary: "",
+		details: "",
+	} 
 
-	/*
-	
-	TODO:
 	- reword implied consent prompt
-	- color-contrast
-	- choices-respected
-	- blocking check
+	- check that purpose check works on atoy.se and eho.fi
 	*/
 
-	const cookies = await desktopPage.cookies();
+	const analysisResults: AnalysisResult<any>[] = [];
 
 	const desktopBanner = await desktopPage.$(selector);
 
@@ -267,143 +186,148 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 		return null; // TODO: Implement error handling if banner can't be found.
 	}
 
-	let cookiesBeforeConsentCheckResult = findCheckResult(analysisResults, "cookies-before-consent");
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	cookiesBeforeConsentCheckResult = await getCookiesBeforeConsent(cookies, cookiesBeforeConsentCheckResult, database);
+	const cookies = await desktopPage.cookies();
+	const cookiesBeforeConsentResult = new CookiesBeforeConsentAnalyser(
+		"cookies-before-consent",
+		"Cookies Before Consent",
+		"Checks whether cookies are set before consent is obtained from the website's user.",
+		"Functionality",
+	);
+	const cookiesBeforeConsentParams: CookiesBeforeConsentAnalyserParams = {
+		cookies: cookies,
+		database: database,
+	};
 
-	const bannerSizePercentage = desktopBanner ? await getBannerAreaPercentage(desktopBanner, desktopPage) : 0;
-	const bannerSizeCheckResult = findCheckResult(analysisResults, "banner-size");
+	await cookiesBeforeConsentResult.analyze(cookiesBeforeConsentParams);
+	analysisResults.push(cookiesBeforeConsentResult);
 
-	bannerSizeCheckResult.resultSummary = `The cookie banner takes up ${Math.round(
-		bannerSizePercentage,
-	)}% of the screen.`;
-	if (Math.round(bannerSizePercentage) >= 25) {
-		bannerSizeCheckResult.status = "Warning";
-	} else {
-		bannerSizeCheckResult.status = "Pass";
-	}
+	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", "Design");
+	const bannerSizeParams: BannerSizeAnalyserParams = {
+		banner: desktopBanner,
+		page: desktopPage,
+	};
 
-	//const textAndTypeDesktop = await getTextAndType(desktopBanner);
-
-	// Note: When evaluating this success criterion, the font size in points should be obtained from the user agent or calculated on font metrics in the way that user agents do. Point sizes are based on the CSS pt size CSS3 Values. The ratio between sizes in points and CSS pixels is 1pt = 1.333px, therefore 14pt and 18pt are equivalent to approximately 18.5px and 24px.
+	await bannerSizeResult.analyze(bannerSizeParams);
+	analysisResults.push(bannerSizeResult);
 
 	const cookieBannerTextElements = await getCookieBannerTextElements(selector, desktopPage);
-	console.log(JSON.stringify(cookieBannerTextElements));
 
-	const elementContrasts: { index: number; contrastLevel: string; contrast: number; isLargeText: boolean }[] = [];
+	const colorContrastResult = new ColorContrastAnalyser(
+		"color-contrast",
+		"Color Contrast",
+		"Checks that the cookie banner follows accessibility standards in color contrast.",
+		"Accessibility",
+	);
+	const colorContrastParams: ColorContrastAnalyserParams = {
+		cookieBannerTextElements: cookieBannerTextElements,
+	};
 
-	for (const element of cookieBannerTextElements) {
-		const domElement = element.element; // TODO: potentially implement selectors here for future proofing.
+	await colorContrastResult.analyze(colorContrastParams);
+	analysisResults.push(colorContrastResult);
 
-		if (domElement) {
-			const textColor = await getDeepestChildColor(domElement);
-			const style = await domElement.evaluate((el, textColor) => {
-				const style = getComputedStyle(el);
-				const backgroundColor = style.getPropertyValue("background-color");
-				const fontWeight = +style.getPropertyValue("font-weight");
-				const fontSize = +style.getPropertyValue("font-size").replace("px", "");
-				return { color: textColor, backgroundColor, fontWeight, fontSize };
-			}, textColor);
+	const { results, chunkSizes } = await sendChunksToChatGPT(cookieBannerTextElements);
 
-			let elementContrast = 1;
+	const gptResultMerged = mergeResults(results, chunkSizes);
+	console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
 
-			if (style.backgroundColor && style.backgroundColor != "rgba(0, 0, 0, 0)") {
-				const hexColor = convertToHex(style.color);
-				const hexBgColor = convertToHex(style.backgroundColor);
-				const contrast = WCAG.hex(hexColor, hexBgColor);
-				elementContrast = contrast;
+	const textClarityResult = new TextClarityAnalyser(
+		"clarity",
+		"Text Clarity",
+		"Checks whether the text does not contain legal jargon and that it is generally clear.",
+		"Information",
+	);
+	const textClarityParams: TextClarityAnalyserParams = {
+		gptResult: gptResultMerged,
+	};
 
-				console.log(
-					`A ${element.index}. Text: ${element.text} Contrast between ${hexColor} and ancestor ${hexBgColor} is ${contrast}. %%%%`,
-				);
-				// TODO: Calculate contrast between element's own color and background. DONE
-				// TODO: Compare the element's background to the ancestor's background.
+	await textClarityResult.analyze(textClarityParams);
+	analysisResults.push(textClarityResult);
 
-				// TODO: Might implement this:
-				/*const ancestor = await findAncestorWithBackgroundColor(domElement);
-				// TODO: What to do if ancestor is null?
-				if (ancestor) {
-					const ancestorStyle = await ancestor.evaluate((el) => {
-						const style = getComputedStyle(el);
-						const backgroundColor = style.getPropertyValue("background-color");
-						return { backgroundColor };
-					});
+	const purposeResult = new PurposeAnalyser(
+		"purpose",
+		"Cookie Purpose",
+		"Checks whether cookies' purpose is described clearly.",
+		"Information",
+	);
+	const purposeParams: PurposeAnalyserParams = {
+		gptResult: gptResultMerged,
+	};
 
-					const ancestorHexBgColor = convertToHex(ancestorStyle.backgroundColor);
-					const ancestorContrast = WCAG.hex(hexBgColor, ancestorHexBgColor);
+	await purposeResult.analyze(purposeParams);
+	analysisResults.push(purposeResult);
 
-					console.log(
-						`B Text: ${element.text} Contrast between ${hexBgColor} and ancestor ${ancestorHexBgColor} is ${ancestorContrast}. %%%%`,
-					);
-				}*/
-			} else {
-				const ancestor = await findAncestorWithBackgroundColor(domElement);
-				// TODO: What to do if ancestor is null?
-				if (ancestor) {
-					const ancestorStyle = await ancestor.evaluate((el) => {
-						const style = getComputedStyle(el);
-						const backgroundColor = style.getPropertyValue("background-color");
-						return { backgroundColor };
-					});
+	const impliedConsentResult = new ImpliedConsentAnalyser(
+		"implied-consent",
+		"Implied Consent",
+		"Checks that the cookie banner doesn't assume implied consent.",
+		"Functionality",
+	);
+	const impliedConsentParams: ImpliedConsentAnalyserParams = {
+		gptResult: gptResultMerged,
+	};
 
-					const hexColor = convertToHex(style.color);
-					const hexBgColor = convertToHex(ancestorStyle.backgroundColor);
-					const contrast = WCAG.hex(hexColor, hexBgColor);
+	await impliedConsentResult.analyze(impliedConsentParams);
+	analysisResults.push(impliedConsentResult);
 
-					elementContrast = contrast;
+	const languageResult = new LanguageAnalyser(
+		"language-consistency",
+		"Language Consistency",
+		"Checks whether the cookie banner's language is the same as the page's.",
+		"Accessibility",
+	);
+	const languageParams: LanguageAnalyserParams = {
+		gptResult: gptResultMerged,
+		bannerSelector: selector,
+		page: desktopPage,
+	};
 
-					console.log(
-						`C ${element.index}. Text: ${element.text} Contrast between ${hexColor} and ancestor ${hexBgColor} is ${contrast}. %%%%`,
-					);
-				}
-				// TODO: Compare the text color to the ancestor's background. DONE
-			}
+	await languageResult.analyze(languageParams);
+	analysisResults.push(languageResult);
 
-			const isLargeText = (style.fontSize >= 18.5 && style.fontWeight >= 700) || style.fontSize >= 24;
+	const acceptButtonElement = cookieBannerTextElements.find(
+		(element) => element.index == gptResultMerged["accept-btn"],
+	);
+	const rejectButtonElement = cookieBannerTextElements.find(
+		(element) => element.index == gptResultMerged["reject-btn"],
+	);
 
-			let contrastLevel = "FAIL";
+	const rejectButtonLayerResult = new RejectButtonLayerAnalyser(
+		"reject-button-layer",
+		"Reject Button Layer",
+		"Checks whether a button to reject all cookies exists and how difficult it is to get to.",
+		"Functionality",
+	);
+	const rejectButtonLayerParams: RejectButtonLayerAnalyserParams = {
+		rejectButtonElement: rejectButtonElement,
+		page: desktopPage,
+	};
 
-			if (isLargeText) {
-				if (elementContrast >= 4.5) {
-					contrastLevel = "AAA";
-				} else if (elementContrast >= 3) {
-					contrastLevel = "AA";
-				}
-			} else {
-				if (elementContrast >= 7) {
-					contrastLevel = "AAA";
-				} else if (elementContrast >= 4.5) {
-					contrastLevel = "AA";
-				}
-			}
+	await rejectButtonLayerResult.analyze(rejectButtonLayerParams);
+	analysisResults.push(rejectButtonLayerResult);
 
-			elementContrasts.push({
-				index: element.index,
-				contrastLevel: contrastLevel,
-				contrast: elementContrast,
-				isLargeText: isLargeText,
-			});
-		}
-	}
+	const nudgingResult = new NudgingAnalyser("nudging", "Nudging", "", "Design");
+	const nudgingParams: NudgingAnalyserParams = {
+		rejectButtonElement: rejectButtonElement,
+		acceptButtonElement: acceptButtonElement,
+		rejectButtonLayerAnalyserStatus: rejectButtonLayerResult.status,
+		page: desktopPage,
+	};
 
-	const colorContrastCheckResult = findCheckResult(analysisResults, "color-contrast");
+	await nudgingResult.analyze(nudgingParams);
+	analysisResults.push(nudgingResult);
 
-	// TODO: Add elements to details.
+	return analysisResults;
+}
 
-	const failedContrastElements = elementContrasts.filter((el) => el.contrastLevel == "FAIL");
-	const aaContrastElements = elementContrasts.filter((el) => el.contrastLevel == "AA");
-
-	if (failedContrastElements.length > 0) {
-		colorContrastCheckResult.resultSummary = `${failedContrastElements.length} of the cookie banner's text's contrast is insufficient (WCAG's AA minimum contrast).`;
-		colorContrastCheckResult.status = "Fail";
-	} else if (aaContrastElements.length > 0) {
-		colorContrastCheckResult.resultSummary = `${aaContrastElements.length} of the cookie banner's text's contrast has a contrast rating of AA (WCAG's minimum contrast), but should be AAA.`;
-		colorContrastCheckResult.status = "Warning";
-	} else {
-		colorContrastCheckResult.resultSummary = "Cookie banner contains no elements with insufficient contrast.";
-		colorContrastCheckResult.status = "Pass";
-	}
-
+async function sendChunksToChatGPT(
+	cookieBannerTextElements: {
+		index: number;
+		tag: string;
+		text: string;
+		element: ElementHandle<Element>;
+		selector: string;
+	}[],
+) {
 	const chunkMaxTokenSize = calculateInputMaxTokens();
 	const chunks = [];
 	let currentChunk = "";
@@ -431,383 +355,7 @@ async function analyzeBanner(selector: string, database: Db): Promise<CheckResul
 		}
 	}
 
-	const gptResultMerged = mergeResults(results, chunkSizes);
-	console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
-
-	const textClarityCheckResult = findCheckResult(analysisResults, "clarity");
-
-	if (gptResultMerged["legal-jargon"]) {
-		textClarityCheckResult.resultSummary = `The cookie banner seems to contain legal jargon or unclear text.`;
-		textClarityCheckResult.status = "Warning";
-	} else {
-		textClarityCheckResult.resultSummary = `The cookie banner seems to have clear text and does not contain legal jargon.`;
-		textClarityCheckResult.status = "Pass";
-	}
-
-	const purposeCheckResult = findCheckResult(analysisResults, "purpose");
-
-	if (gptResultMerged["purpose-described"]) {
-		purposeCheckResult.resultSummary = `The cookie banner seems to describe the purpose of the cookies clearly.`;
-		purposeCheckResult.status = "Pass";
-	} else {
-		purposeCheckResult.resultSummary = `The cookie banner does not seem to describe the purpose of the cookies.`;
-		purposeCheckResult.status = "Warning";
-	}
-
-	const impliedConsentCheckResult = findCheckResult(analysisResults, "implied-consent");
-
-	if (gptResultMerged["implied-consent"]) {
-		impliedConsentCheckResult.resultSummary = `The cookie banner contains wording that suggests that the user has no say in consent i.e. Implied consent.`;
-		impliedConsentCheckResult.status = "Fail";
-	} else {
-		impliedConsentCheckResult.resultSummary = `The cookie banner does not seem to contain wording of implied consent.`;
-		impliedConsentCheckResult.status = "Pass";
-	}
-
-	const languageCheckResult = findCheckResult(analysisResults, "language-consistency");
-	if (await checkLanguageDifference(gptResultMerged["lang"], selector)) {
-		languageCheckResult.resultSummary = "The cookie banner has the same language as the website.";
-		languageCheckResult.status = "Pass";
-	} else {
-		languageCheckResult.resultSummary = "The cookie banner's language is not the same as the website's.";
-		languageCheckResult.status = "Fail";
-	}
-
-	const acceptButtonElement = cookieBannerTextElements.find(
-		(element) => element.index == gptResultMerged["accept-btn"],
-	);
-	const rejectButtonElement = cookieBannerTextElements.find(
-		(element) => element.index == gptResultMerged["reject-btn"],
-	);
-
-	const rejectButtonLayerCheckResult = findCheckResult(analysisResults, "reject-button-layer");
-
-	if (rejectButtonElement) {
-		console.log(`Reject button selector: ${JSON.stringify(rejectButtonElement.selector)}`);
-
-		rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found within the cookie banner, but not on the first layer.`;
-		rejectButtonLayerCheckResult.status = "Warning";
-
-		const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.selector);
-
-		if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
-			rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was found on the first layer of the cookie banner.`;
-			rejectButtonLayerCheckResult.status = "Pass";
-		}
-	} else {
-		rejectButtonLayerCheckResult.resultSummary = `A button to Reject All cookies was not found within the cookie banner.`;
-		rejectButtonLayerCheckResult.status = "Fail";
-	}
-
-	const nudgingCheckResult = findCheckResult(analysisResults, "nudging");
-
-	nudgingCheckResult.resultSummary = `This check was skipped due to the accept/decline button missing or being on different layers.`;
-	nudgingCheckResult.status = "Skipped";
-
-	if (rejectButtonElement && acceptButtonElement && rejectButtonLayerCheckResult.status == "Pass") {
-		// Reject Pass check so that it isn't on another layer.
-		const nudgingCheck = await checkNudging(rejectButtonElement, acceptButtonElement);
-		if (nudgingCheck == "pass") {
-			nudgingCheckResult.resultSummary = "The cookie banner does not nudge the user's consent decision by design.";
-			nudgingCheckResult.status = "Pass";
-		} else if (nudgingCheck == "warning") {
-			nudgingCheckResult.resultSummary =
-				"The cookie banner seems to nudge the user's consent decision by differentiating the styling of the accept/decline buttons.";
-			nudgingCheckResult.status = "Warning";
-		}
-	}
-
-	return analysisResults;
-}
-
-const getDeepestChildColor = async (element: ElementHandle) => {
-	return await element.evaluate((el) => {
-		const findDeepestChildColor = (node: Element): string | null => {
-			let result = null;
-
-			for (const child of Array.from(node.children)) {
-				const childStyle = getComputedStyle(child);
-				const childColor = childStyle.getPropertyValue("color");
-
-				if (childColor !== getComputedStyle(node).getPropertyValue("color")) {
-					result = childColor;
-				}
-
-				const childResult = findDeepestChildColor(child);
-
-				if (childResult) {
-					result = childResult;
-				}
-			}
-
-			return result;
-		};
-
-		return findDeepestChildColor(el) || getComputedStyle(el).getPropertyValue("color");
-	});
-};
-
-async function findAncestorWithBackgroundColor(element: ElementHandle): Promise<ElementHandle | null> {
-	let currentElement = element;
-
-	while ((await currentElement.evaluate((el) => el.tagName)) !== "HTML") {
-		currentElement = (await currentElement.$$("xpath/.."))[0];
-		if (await hasBackground(currentElement)) {
-			return currentElement;
-		}
-	}
-
-	return null;
-}
-
-async function hasBackground(element: ElementHandle): Promise<boolean> {
-	const style = await element.evaluate((el) => {
-		const style = getComputedStyle(el);
-		const backgroundColor = style.getPropertyValue("background-color");
-		const background = style.getPropertyValue("background");
-		const display = style.getPropertyValue("display");
-		return { backgroundColor, background, display };
-	});
-
-	if (style.display == "none") {
-		return false;
-	}
-
-	const hasBackgroundColor = !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
-	const hasBackground = !style.background.includes("rgba(0, 0, 0, 0)");
-
-	if (hasBackgroundColor || hasBackground) {
-		return true;
-	}
-
-	return false;
-}
-
-function convertToHex(colorString: string): string {
-	const color = Color(colorString);
-	const rgba = color.rgb().array();
-	const hex = color.hex();
-	const hasAlpha = colorString.toLowerCase().includes("rgba");
-	if (hasAlpha) {
-		const alpha = hasAlpha && rgba[3] !== undefined ? (rgba[3] * 255).toString(16) : "";
-		return hex + alpha.padStart(2, "0");
-	}
-	return hex;
-}
-
-async function checkLanguageDifference(bannerLanguage: string, selector: string): Promise<boolean> {
-	// TODO: Adjust these limits to strike a balance between used credits and enough linguistic information.
-	const charLimit = 50;
-	const numSnippets = 10;
-	const snippets = await extractRandomText(desktopPage, selector, charLimit, numSnippets);
-
-	const pageLanguage = (await sendChatAPIRequest(languageCheckPrompt, snippets.join(" "), 10))?.content;
-
-	return pageLanguage == bannerLanguage;
-}
-
-async function extractRandomText(
-	page: Page,
-	selectorToExclude: string,
-	charLimit: number,
-	numSnippets: number,
-): Promise<string[]> {
-	return await page.$$eval(
-		"*",
-		(elements, excludeSelector, limit, count) => {
-			const textTags = [
-				"p",
-				"h1",
-				"h2",
-				"h3",
-				"h4",
-				"h5",
-				"h6",
-				"span",
-				"li",
-				"a",
-				"strong",
-				"em",
-				"blockquote",
-				"figcaption",
-				"label",
-				"td",
-			];
-			elements = elements.filter(
-				(el) =>
-					textTags.includes(el.tagName.toLowerCase()) &&
-					!el.closest(excludeSelector) &&
-					el.textContent &&
-					el.textContent.trim().length > 0,
-			);
-			const snippets: string[] = [];
-			for (let i = 0; i < count && elements.length > 0; i++) {
-				const randomIndex = Math.floor(Math.random() * elements.length);
-				const randomElement = elements.splice(randomIndex, 1)[0];
-				const text = randomElement.textContent!.trim().substring(0, limit);
-				snippets.push(text.replace(/\s+/g, " ").trim());
-			}
-			return snippets;
-		},
-		selectorToExclude,
-		charLimit,
-		numSnippets,
-	);
-}
-
-async function getCookiesBeforeConsent(
-	cookies: Protocol.Network.Cookie[],
-	cookiesBeforeConsentCheckResult: CheckResult,
-	database: Db,
-): Promise<CheckResult> {
-	const foundCookies: CookieResult[] = [];
-
-	for (const clientCookie of cookies) {
-		const foundClientCookie = <CookieResult>{
-			ClientCookie: clientCookie,
-			CookieObject: undefined,
-		};
-		foundClientCookie.CookieObject = await database.getCookie({ cookieName: clientCookie.name });
-		foundCookies.push(foundClientCookie);
-	}
-
-	const unknownCookies = foundCookies.filter((el) => el.CookieObject == undefined);
-	const knownNecessaryCookies = foundCookies.filter(
-		(el) => el.CookieObject != undefined && el.CookieObject.category == "Functional",
-	);
-	const knownUnnecessaryCookies = foundCookies.filter(
-		(el) => el.CookieObject != undefined && el.CookieObject.category != "Functional",
-	);
-
-	if (knownUnnecessaryCookies.length > 0) {
-		cookiesBeforeConsentCheckResult.resultSummary = `Found ${
-			knownUnnecessaryCookies.length
-		} known unnecessary cookie(s) ${
-			unknownCookies.length > 0 ? `and ${unknownCookies.length} unknown cookie(s) ` : ""
-		}before consent choice.`;
-		cookiesBeforeConsentCheckResult.status = "Fail";
-	} else if (unknownCookies.length > 0) {
-		cookiesBeforeConsentCheckResult.resultSummary = `Found ${unknownCookies.length} unknown cookie(s) before consent choice. The necessity of these cookies should be manually checked.`;
-		cookiesBeforeConsentCheckResult.status = "Warning";
-	} else {
-		if (knownNecessaryCookies.length > 0) {
-			cookiesBeforeConsentCheckResult.resultSummary = `Found ${knownNecessaryCookies.length} cookie(s) before consent choice, but they all are known "Functional" cookies.`;
-		} else {
-			cookiesBeforeConsentCheckResult.resultSummary = "No cookies were set before consent choice.";
-		}
-
-		cookiesBeforeConsentCheckResult.status = "Pass";
-	}
-
-	return cookiesBeforeConsentCheckResult;
-}
-
-async function checkNudging(
-	rejectButtonElement: {
-		index?: number;
-		tag?: string;
-		text?: string;
-		element: ElementHandle<Element>;
-		selector: string;
-	},
-	acceptButtonElement: {
-		index?: number;
-		tag?: string;
-		text?: string;
-		element: ElementHandle<Element>;
-		selector: string;
-	},
-) {
-	const rejectButtonDOMElement = await desktopPage.$(rejectButtonElement.selector);
-	const acceptButtonDOMElement = await desktopPage.$(acceptButtonElement.selector);
-
-	let result = "skipped";
-
-	if (rejectButtonDOMElement && acceptButtonDOMElement) {
-		result = "warning";
-
-		type StyleProperties = {
-			background: string;
-			color: string;
-			fontSize: string;
-			fontWeight: string;
-			fontFamily: string;
-			opacity: string;
-		};
-
-		const propertyList: (keyof StyleProperties)[] = [
-			"background",
-			"color",
-			"fontSize",
-			"fontWeight",
-			"fontFamily",
-			"opacity",
-		];
-
-		const rejectButtonStyle = await rejectButtonDOMElement.evaluate((el, propertyList) => {
-			const style = getComputedStyle(el);
-			const styleObject: StyleProperties = {
-				background: "",
-				color: "",
-				fontSize: "",
-				fontWeight: "",
-				fontFamily: "",
-				opacity: "",
-			};
-
-			for (const property of propertyList) {
-				styleObject[property] = style.getPropertyValue(property);
-			}
-			return styleObject;
-		}, propertyList);
-
-		const acceptButtonStyle = await acceptButtonDOMElement.evaluate((el, propertyList) => {
-			const style = getComputedStyle(el);
-			const styleObject: StyleProperties = {
-				background: "",
-				color: "",
-				fontSize: "",
-				fontWeight: "",
-				fontFamily: "",
-				opacity: "",
-			};
-
-			for (const property of propertyList) {
-				styleObject[property] = style.getPropertyValue(property);
-			}
-			return styleObject;
-		}, propertyList);
-
-		console.log(JSON.stringify(rejectButtonStyle));
-		console.log(JSON.stringify(acceptButtonStyle));
-
-		if (JSON.stringify(rejectButtonStyle) === JSON.stringify(acceptButtonStyle)) {
-			result = "pass";
-		}
-	}
-	return result;
-}
-
-/**
- * Sends a request to the OpenAI Chat API.
- * @async
- * @param {string} system - System message for the Chat API.
- * @param {string} input - User message for the Chat API.
- * @param {number} maxOutputTokens - Maximum number of tokens for the API response.
- * @returns {Promise<Object>} The message object from the API response.
- */
-async function sendChatAPIRequest(system: string, input: string, maxOutputTokens: number) {
-	const completion = await openai.createChatCompletion({
-		model: "gpt-3.5-turbo",
-		messages: [
-			{ role: "system", content: system },
-			{ role: "user", content: input },
-		],
-		max_tokens: maxOutputTokens,
-		temperature: 0,
-	});
-	console.log(completion.data.usage);
-	return completion.data.choices[0].message;
+	return { results, chunkSizes };
 }
 
 /**
@@ -836,7 +384,7 @@ function calculateInputMaxTokens(): number {
  * @param {Page} page - The Puppeteer Page object.
  * @returns {Promise<number>} The percentage of the viewport area occupied by the cookie banner.
  */
-async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promise<number> {
+/*async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promise<number> {
 	const boundingBox = await banner.boundingBox();
 	const boundingBoxArea =
 		(boundingBox?.width ? boundingBox?.width : 0) * (boundingBox?.height ? boundingBox?.height : 0);
@@ -845,7 +393,7 @@ async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promi
 	const viewportArea = (viewportSize[0] ? viewportSize[0] : 0) * (viewportSize[1] ? viewportSize[1] : 0);
 
 	return (boundingBoxArea / viewportArea) * 100;
-}
+}*/
 
 async function getCookieBannerTextElements(
 	bannerSelector: string,
@@ -919,23 +467,14 @@ async function getCookieBannerTextElements(
 	return output;
 }
 
-interface Result {
-	"legal-jargon": boolean;
-	"purpose-described": boolean;
-	lang: string;
-	"reject-btn": number | null;
-	"accept-btn": number | null;
-	"implied-consent": boolean;
-}
-
 /**
  * Merges multiple GPT results (in case of chunking) into a single result object.
  * @param {Array} results - An array of result objects.
  * @param {Array} inputSizes - An array of input sizes corresponding to the results.
- * @returns {Result} A merged result object.
+ * @returns {GPTResult} A merged result object.
  */
-function mergeResults(results: Result[], inputSizes: number[]): Result {
-	const finalResult: Result = {
+function mergeResults(results: GPTResult[], inputSizes: number[]): GPTResult {
+	const finalResult: GPTResult = {
 		"legal-jargon": false,
 		"purpose-described": false,
 		lang: "",
