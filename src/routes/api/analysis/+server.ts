@@ -27,6 +27,7 @@ import { PurposeAnalyser, type PurposeAnalyserParams } from "$lib/server/analyse
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
+import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
 
 const systemPrompt = `You are a legal assistant and your job is to:
 
@@ -45,7 +46,10 @@ Here are some examples of Reject All buttons:
 {ID}-a: "Kiellä"
 {ID}-button: "Only allow essential cookies"
 {ID}-button: "Decline optional cookies"
-Buttons to "manage settings" etc are NOT considered Reject All -buttons.
+Buttons to manage settings or manage cookies etc are NOT considered Reject All -buttons.
+For example:
+{ID}-button: "Settings" and {ID}-a: "Manage Cookies"
+are NOT considered as Reject buttons.
 
 5. Determine which clickable element is used to ACCEPT ALL cookies.
 Answer with the id provided for the element. Set to null if there is no clickable element to accept all cookies.
@@ -122,26 +126,7 @@ async function getResults(selector: string, database: Db, page: Page): Promise<A
  */
 async function analyzeBanner(selector: string, database: Db, page: Page): Promise<AnalysisResult<any>[] | null> {
 	// TODO: Left to implement are the following:
-	/**
-	 * {
-	 * id: "blocking",
-		name: "Blocking",
-		description: "",
-		category: "Design",
-		status: "Undefined",
-		resultSummary: "",
-		details: "",
-	 * }
-	 * {
-		id: "choices-respected",
-		name: "Choices Respected",
-		description: "Checks that the user's consent choices are respected after declining consent.",
-		category: "Functionality",
-		status: "Undefined",
-		resultSummary: "",
-		details: "",
-	} 
-
+	/*
 	- reword implied consent prompt
 	- check that purpose check works on atoy.se and eho.fi
 	*/
@@ -284,6 +269,15 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await nudgingResult.analyze(nudgingParams);
 	analysisResults.push(nudgingResult);
 
+	const blockingResult = new BlockingAnalyser("blocking", "Blocking", "", "Design");
+	const blockingResultParams: BlockingAnalyserParams = {
+		page: page,
+		cookieBanner: desktopBanner,
+	};
+
+	await blockingResult.analyze(blockingResultParams);
+	analysisResults.push(blockingResult);
+
 	return analysisResults;
 }
 
@@ -344,24 +338,6 @@ function calculateTokens(text: string): number {
 function calculateInputMaxTokens(): number {
 	return apiTotalTokenLimit - calculateTokens(systemPrompt) - longestPossibleOutput;
 }
-
-/**
- * Calculates the percentage of the viewport area occupied by the cookie banner.
- * @async
- * @param {ElementHandle} banner - The ElementHandle representing the cookie banner.
- * @param {Page} page - The Puppeteer Page object.
- * @returns {Promise<number>} The percentage of the viewport area occupied by the cookie banner.
- */
-/*async function getBannerAreaPercentage(banner: ElementHandle, page: Page): Promise<number> {
-	const boundingBox = await banner.boundingBox();
-	const boundingBoxArea =
-		(boundingBox?.width ? boundingBox?.width : 0) * (boundingBox?.height ? boundingBox?.height : 0);
-
-	const viewportSize = getViewportSizeIndividually(page);
-	const viewportArea = (viewportSize[0] ? viewportSize[0] : 0) * (viewportSize[1] ? viewportSize[1] : 0);
-
-	return (boundingBoxArea / viewportArea) * 100;
-}*/
 
 async function getCookieBannerTextElements(
 	bannerSelector: string,
