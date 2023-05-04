@@ -1,23 +1,15 @@
 export default class BannerFindResponse {
-	public readonly finderName: string;
-	public readonly devices: DeviceResult[];
-
-	constructor(finderName: string, deviceResults: DeviceResult[]) {
-		this.finderName = finderName;
-		this.devices = deviceResults;
-	}
-}
-
-export class DeviceResult {
-	public readonly resolution: string;
 	public readonly screenshot: string;
-	public readonly durationMs: number;
 	public readonly selector: string;
+	public readonly resolution: string;
+	public readonly url: string;
+	public readonly isMobile: boolean;
 
-	constructor(resolution: string, screenshot: string, durationMs: number, selector: string) {
-		this.resolution = resolution;
+	constructor(screenshot: string, selector: string, resolution: string, url: string, isMobile: boolean) {
 		this.screenshot = screenshot;
-		this.durationMs = durationMs;
 		this.selector = selector;
+		this.resolution = resolution;
+		this.url = url;
+		this.isMobile = isMobile;
 	}
 }

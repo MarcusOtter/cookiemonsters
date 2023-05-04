@@ -5,6 +5,7 @@ import { getUniqueCommonPhrases } from "../getCommonPhrases";
 
 // TODO: Needs a big refactor.
 export default class MarcusUltraFinder implements BannerFinder {
+	/** @inheritdoc */
 	async findBannerSelector(page: Page): Promise<string> {
 		console.log("##### MARCUS ULTRA START #####");
 

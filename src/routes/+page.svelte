@@ -9,14 +9,19 @@
 
 	function goToBanner(e: FormSubmitEvent) {
 		const data = new FormData(e.currentTarget);
-		for (const [name, value] of data) {
-			console.log(name, ":", value);
+		const searchParams = new URLSearchParams();
+		for (const [name, value] of data.entries()) {
+			console.log(name, value);
+			if (typeof value === "string") {
+				searchParams.append(name, value);
+			} else {
+				console.warn(`Skipping non-string value for field ${name}: ${value}`);
+			}
 		}
-		console.log(data);
-		console.log(e.currentTarget);
+
 		// TODO: Validation on url?
-		// return;
-		window.location.href = `/banner?` + new URLSearchParams({ url });
+
+		window.location.href = `/banner?` + searchParams;
 	}
 </script>
 
