@@ -42,9 +42,31 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 		if (failedContrastElements.length > 0) {
 			this.resultSummary = `${failedContrastElements.length} of the cookie banner's text's contrast is insufficient (WCAG's AA minimum contrast).`;
 			this.status = "Fail";
+			this.details = `Elements with contrast below AA:`;
+
+			for (const contrast of failedContrastElements) {
+				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
+				if (element) {
+					this.details += `
+Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: 1:${
+						Math.round((contrast?.contrast as number) * 10) / 10
+					} (${contrast?.contrastLevel})`;
+				}
+			}
 		} else if (aaContrastElements.length > 0) {
 			this.resultSummary = `${aaContrastElements.length} of the cookie banner's text's contrast has a contrast rating of AA (WCAG's minimum contrast), but should be AAA.`;
 			this.status = "Warning";
+			this.details = `Elements with contrast below AAA:`;
+
+			for (const contrast of aaContrastElements) {
+				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
+				if (element) {
+					this.details += `
+Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: 1:${
+						Math.round((contrast?.contrast as number) * 10) / 10
+					} (${contrast?.contrastLevel})`;
+				}
+			}
 		} else {
 			this.resultSummary = "Cookie banner contains no elements with insufficient contrast.";
 			this.status = "Pass";
@@ -52,6 +74,14 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 	}
 }
 
+function truncateString(str: string, maxLength: number): string {
+	if (str.length <= maxLength) {
+		return str;
+	}
+	return str.slice(0, maxLength - 3) + "...";
+}
+
+// There seem to be edge cases with this, such as uu.se.
 const getDeepestChildColor = async (element: ElementHandle) => {
 	return await element.evaluate((el) => {
 		const findDeepestChildColor = (node: Element): string | null => {
@@ -71,7 +101,6 @@ const getDeepestChildColor = async (element: ElementHandle) => {
 					result = childResult;
 				}
 			}
-
 			return result;
 		};
 
@@ -147,7 +176,7 @@ async function getElementContrasts(
 
 	for (const element of cookieBannerTextElements) {
 		const domElement = element.element; // TODO: potentially implement selectors here for future proofing.
-
+		console.log(`Checking element: ${element.index}, ${truncateString(element.text, 50)}`);
 		if (domElement) {
 			const textColor = await getDeepestChildColor(domElement);
 			const style = await domElement.evaluate((el, textColor) => {
@@ -164,6 +193,9 @@ async function getElementContrasts(
 				const hexColor = convertToHex(style.color);
 				const hexBgColor = convertToHex(style.backgroundColor);
 				const contrast = WCAG.hex(hexColor, hexBgColor);
+				console.log(
+					`Colors: ${hexColor} (${style.color}) and ${hexBgColor} (${style.backgroundColor}), have contrast: ${contrast}`,
+				);
 				elementContrast = contrast;
 
 				// TODO: Calculate contrast between element's own color and background. DONE
@@ -199,6 +231,9 @@ async function getElementContrasts(
 					const hexColor = convertToHex(style.color);
 					const hexBgColor = convertToHex(ancestorStyle.backgroundColor);
 					const contrast = WCAG.hex(hexColor, hexBgColor);
+					console.log(
+						`Colors: ${hexColor} (${style.color}) and ${hexBgColor} (${ancestorStyle.backgroundColor}), have contrast: ${contrast}`,
+					);
 
 					elementContrast = contrast;
 				}

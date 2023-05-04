@@ -52,9 +52,35 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 				unknownCookies.length > 0 ? `and ${unknownCookies.length} unknown cookie(s) ` : ""
 			}before consent choice.`;
 			this.status = "Fail";
+			this.details += `Known unnecessary cookies:`;
+
+			for (const cookie of knownUnnecessaryCookies) {
+				this.details += `
+Name: ${cookie.ClientCookie.name}
+Type: ${cookie.CookieObject?.category}
+Data Controller: ${cookie.CookieObject?.controller}
+Description: ${cookie.CookieObject?.description}
+`;
+			}
+
+			if (unknownCookies.length > 0) {
+				this.details += `
+Unknown cookies:`;
+				for (const cookie of unknownCookies) {
+					this.details += `
+Name: ${cookie.ClientCookie.name}
+`;
+				}
+			}
 		} else if (unknownCookies.length > 0) {
 			this.resultSummary = `Found ${unknownCookies.length} unknown cookie(s) before consent choice. The necessity of these cookies should be manually checked.`;
 			this.status = "Warning";
+			this.details = `Unknown cookies:`;
+			for (const cookie of unknownCookies) {
+				this.details += `
+Name: ${cookie.ClientCookie.name}
+			`;
+			}
 		} else {
 			if (knownNecessaryCookies.length > 0) {
 				this.resultSummary = `Found ${knownNecessaryCookies.length} cookie(s) before consent choice, but they all are known "Functional" cookies.`;
@@ -63,6 +89,19 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 			}
 
 			this.status = "Pass";
+		}
+
+		if (knownNecessaryCookies.length > 0) {
+			this.details += `
+Known necessary cookies:`;
+			for (const cookie of knownNecessaryCookies) {
+				this.details += `
+Name: ${cookie.ClientCookie.name}
+Type: ${cookie.CookieObject?.category}
+Data Controller: ${cookie.CookieObject?.controller}
+Description: ${cookie.CookieObject?.description}
+`;
+			}
 		}
 	}
 }
