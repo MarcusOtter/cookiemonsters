@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import type AnalysisResult from "$lib/AnalysisResult";
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 
-	let results: AnalysisResult[] = [];
+	let results: any[] = [];
 	let isLoading = false;
 	let targetUrl = "";
 	let selector = "";
 	let errorMessage = "";
-	let selectedResultIndex = 0;
 
 	// If url is missing for some reason (like manually visiting /analysis) we redirect to / (using SvelteKit)
 	onMount(async () => {
@@ -42,7 +40,8 @@
 			return;
 		}
 
-		results = (await response.json()) as AnalysisResult[];
+		results = (await response.json()) as any[];
+		console.dir(results);
 		isLoading = false;
 	}
 </script>
@@ -52,23 +51,16 @@
 <h1>Analysis of {targetUrl}</h1>
 
 {#if results.length > 0}
-	<select on:change={(e) => (selectedResultIndex = parseInt(e.currentTarget.value))}>
-		{#each results as result, index}
-			<option value={index} selected={index === selectedResultIndex}>{result.name}</option>
+	<ul>
+		{#each results as result}
+			<li>{JSON.stringify(result)}</li>
 		{/each}
-	</select>
-	{#each results[selectedResultIndex].viewports as viewport}
-		<h2>Screenshot {viewport.resolution}</h2>
-		<p>Found banner: {viewport.foundBanner ? "✅ Yes" : "❌ No"}</p>
-		<p>Time taken: {viewport.findDurationMs.toFixed(0)}ms</p>
-		<img src="data:image/png;base64,{viewport.screenshotBase64}" alt="Screenshot" />
-	{/each}
+	</ul>
 {:else if isLoading}
 	<h2>Loading...</h2>
 {:else if errorMessage.length > 0}
 	<h2>Error</h2>
 	<p>{errorMessage}</p>
-	<a href="/analysis?url={targetUrl}">Try again</a>
 {/if}
 
 <style>
@@ -78,9 +70,5 @@
 
 	h2 {
 		margin-block-start: 48px;
-	}
-
-	select {
-		margin-block-start: 16px;
 	}
 </style>
