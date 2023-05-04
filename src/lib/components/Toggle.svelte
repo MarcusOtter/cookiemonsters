@@ -18,7 +18,15 @@
 <div>
 	<label for={id}>{leftLabel}</label>
 	<label for={id} class="switch">
-		<input type="checkbox" {id} role="switch" aria-checked={checked} on:change|preventDefault={onChange} />
+		<!-- Mobile should not be hardcoded here but it is what it is -->
+		<input
+			type="checkbox"
+			{id}
+			name="isMobile"
+			role="switch"
+			aria-checked={checked}
+			on:change|preventDefault={onChange}
+		/>
 		<span class="slider {round ? 'round' : ''}" />
 	</label>
 	<label for={id}>{rightLabel}</label>

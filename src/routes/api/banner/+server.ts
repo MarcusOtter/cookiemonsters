@@ -6,13 +6,17 @@ import type { RequestHandler } from "./$types";
 import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
 import { json, error } from "@sveltejs/kit";
-import BannerFindResponse, { DeviceResult } from "$lib/contracts/BannerFindResponse";
+import BannerFindResponse from "$lib/contracts/BannerFindResponse";
 import { getViewportSize } from "$lib/server/puppeteerHelpers";
-import getBannerFinders from "$lib/server/finders/getBannerFinders";
 import BannerSelector from "$lib/server/db/BannerSelector";
+import MarcusUltraFinder from "$lib/server/finders/MarcusUltraFinder";
 
 export const GET = (async (request): Promise<Response> => {
 	let urlString = request.url.searchParams.get("url") ?? "";
+	const isMobile = !!(request.url.searchParams.get("isMobile") ?? false);
+	const width = parseInt(request.url.searchParams.get("width") ?? "1920");
+	const height = parseInt(request.url.searchParams.get("height") ?? "1080");
+
 	if (!urlString.startsWith("http")) {
 		urlString = `https://${urlString}`;
 	}
@@ -22,90 +26,64 @@ export const GET = (async (request): Promise<Response> => {
 	}
 
 	const url = new URL(urlString);
-	const desktopPage = await getDesktopPage(url);
-	const mobilePage = await getMobilePage(url);
+	const page = isMobile ? await getMobilePage(width, height, url) : await getDesktopPage(width, height, url);
+	const viewportSize = getViewportSize(page);
 
 	try {
 		const database = new Db();
 		await database.init();
 
-		// TODO: If we didn't find a selector based on full URL, we should try the hostname (subdomain + domain + TLD)
 		// If we at any point find a selector, we need to try to find the element. If we can not find the element, go next.
 		// If we find the element, screenshot it and compare it to the checksum we have in the DB.
 		// If those checks passed, we don't need to find the cookie banner with a BannerFinder again
 
 		let selector = await database.getSelector({ fullUrl: url.href });
-		const desktopScreenshot = await getScreenshot(selector?.text ?? "", desktopPage);
-		const checksum = getChecksum(desktopScreenshot);
-
-		if (checksum !== selector?.checksum) {
+		if (!(await isActiveSelector(selector, page))) {
 			selector = undefined;
 		}
 
+		// If we didn't find a selector based on full URL, we should try the hostname (subdomain + domain + TLD)
 		if (!selector) {
 			selector = await database.getSelector({ hostname: url.hostname });
-			const desktopScreenshot = await getScreenshot(selector?.text ?? "", desktopPage);
-			const checksum = getChecksum(desktopScreenshot);
-
-			if (checksum !== selector?.checksum) {
+			if (!(await isActiveSelector(selector, page))) {
 				selector = undefined;
 			}
 		}
 
-		if (!selector) {
-			const results = [];
-
-			for (const finder of getBannerFinders()) {
-				const startTime = performance.now();
-
-				const newSelector = await finder.findBannerSelector(desktopPage);
-				const desktopScreenshot = await getScreenshot(newSelector, desktopPage);
-				const mobileScreenshot = await getScreenshot(newSelector, mobilePage);
-
-				const desktopResult = new DeviceResult(
-					getViewportSize(desktopPage),
-					desktopScreenshot,
-					performance.now() - startTime,
-					newSelector,
-				);
-				const mobileResult = new DeviceResult(
-					getViewportSize(mobilePage),
-					mobileScreenshot,
-					performance.now() - startTime,
-					newSelector,
-				);
-
-				// TODO: we should probably retry once more on HTTPS after a delay of 5-10s if the immediate scan did not find anything.
-				// we know if it didn't find anything if the selector is empty
-				// But we should only do this wait if the DOM has changed when waiting.
-
-				results.push(new BannerFindResponse(finder.constructor.name, [desktopResult, mobileResult]));
-			}
-
-			const validSelector = results.flatMap((r) => r.devices).find((d) => d.selector !== "")?.selector;
-			if (validSelector) {
-				// TODO: This still has a bug cause it will write the mobile and desktop selectors,
-				// also I don't even know if they're being used correctly
-				await database.addSelector(new BannerSelector(url, checksum, validSelector));
-			}
-
-			return json(results);
+		if (selector && (await isActiveSelector(selector, page))) {
+			const screenshot = await getScreenshot(selector.text, page);
+			return json(new BannerFindResponse(screenshot, selector.text, viewportSize, url.href, isMobile));
 		}
 
-		const mobileScreenshot = await getScreenshot(selector.text, mobilePage);
-		const desktopResult = new DeviceResult(getViewportSize(desktopPage), desktopScreenshot, 0, selector.text);
+		// One finder for the demo, either one should work
+		// const finder = new OliverBannerFinder();
+		const finder = new MarcusUltraFinder();
 
-		const mobileResult = new DeviceResult(getViewportSize(mobilePage), mobileScreenshot, 0, selector.text);
+		const newSelector = await finder.findBannerSelector(page);
+		let screenshot = await getScreenshot(newSelector, page);
+		const checksum = getChecksum(screenshot);
 
-		return json([new BannerFindResponse("cached", [desktopResult, mobileResult])]);
+		// TODO: we should probably retry once more on HTTPS after a delay of 5-10s if the immediate scan did not find anything.
+		// we know if it didn't find anything if the newSelector is empty
+		// But we should only do this wait if the DOM has changed when waiting.
+
+		if (newSelector) {
+			// TODO: We probably want to add resolution and maybe even the user agent (?)
+			await database.addSelector(new BannerSelector(url, checksum, newSelector));
+		}
+
+		if (!screenshot) {
+			screenshot = (await page.screenshot({ encoding: "base64" })) as string;
+		}
+
+		return json(new BannerFindResponse(screenshot, newSelector, viewportSize, url.href, isMobile));
 	} catch (e) {
 		// TODO: Do not return the error message to the client for security reasons
 		// Can print table names and etc
 		console.error(e);
 		throw error(500, getErrorMessage(e));
 	} finally {
-		await desktopPage.close();
-		await mobilePage.close();
+		await page.close();
 	}
 }) satisfies RequestHandler;
 
@@ -114,20 +92,27 @@ export const GET = (async (request): Promise<Response> => {
  * Returns empty string if the element is not in the viewport.
  */
 async function getScreenshot(selector: string, page: Page): Promise<string> {
-	if (selector === "") return "";
-	console.time("screenshot");
+	if (!selector) return "";
 
-	const banner = await page.$(selector);
-	// TODO: This is not a good way to measure if it is visible or not, I also forgot why I added this
-	// EDIT: It could actually be some other mobile vs desktop thing causing issues
-	const isOnScreen = banner; /*&& (await banner.isIntersectingViewport());*/
+	try {
+		const banner = await page.$(selector);
+		const isOnScreen = banner && (await banner.isIntersectingViewport({ threshold: 0.01 }));
+		if (isOnScreen) {
+			const screenshot = await banner.screenshot({ encoding: "base64" });
+			return screenshot.toString();
+		}
 
-	if (isOnScreen) {
-		const screenshot = await banner.screenshot({ encoding: "base64" });
-		console.timeEnd("screenshot");
-		return screenshot.toString();
+		return "";
+	} catch {
+		return "";
 	}
+}
 
-	console.timeEnd("screenshot");
-	return "";
+async function isActiveSelector(selector: BannerSelector | undefined, page: Page) {
+	if (!selector) return false;
+
+	const screenshot = await getScreenshot(selector.text, page);
+	const checksum = getChecksum(screenshot);
+
+	return checksum === selector.checksum;
 }

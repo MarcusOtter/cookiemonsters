@@ -3,18 +3,16 @@
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 	import type BannerFindResponse from "$lib/contracts/BannerFindResponse";
 
-	let results: BannerFindResponse[] = [];
+	let result: BannerFindResponse;
 	let isLoading = false;
-	let targetUrl = "";
+	let params: URLSearchParams;
 	let errorMessage = "";
 	let selectedResultIndex = 0;
 
 	onMount(async () => {
-		const params = new URLSearchParams(window.location.search);
-		targetUrl = params.get("url") ?? "";
+		params = new URLSearchParams(window.location.search);
 
-		// If url is missing for some reason we redirect to /
-		if (!targetUrl) {
+		if (!params.get("url") || !params.get("width") || !params.get("height")) {
 			window.location.href = "/";
 			return;
 		}
@@ -30,9 +28,8 @@
 		if (isLoading) return;
 
 		isLoading = true;
-		results = [];
 
-		const apiUrl = `/api/banner?` + new URLSearchParams({ url: targetUrl });
+		const apiUrl = `/api/banner?` + params;
 		const response = await fetch(apiUrl, { method: "GET" });
 		if (!response.ok) {
 			errorMessage = await response.text();
@@ -40,36 +37,29 @@
 			return;
 		}
 
-		results = (await response.json()) as BannerFindResponse[];
+		result = (await response.json()) as BannerFindResponse;
 		isLoading = false;
 	}
 </script>
 
 <a href="/">Back to home</a>
 
-<h1>Looking for cookie banners on {targetUrl}...</h1>
-
-{#if results.length > 0}
-	<select on:change={(e) => (selectedResultIndex = parseInt(e.currentTarget.value))}>
-		{#each results as result, index}
-			<option value={index} selected={index === selectedResultIndex}>{result.finderName}</option>
-		{/each}
-	</select>
-	{#each results[selectedResultIndex].devices as viewport}
-		<h2>Screenshot {viewport.resolution}</h2>
-		<p>Found banner: {viewport.selector === "" ? "❌ No" : "✅ Yes"}</p>
-		<p>Time taken: {viewport.durationMs.toFixed(0)}ms</p>
-		<img src="data:image/png;base64,{viewport.screenshot}" alt="Screenshot" />
-		{#if viewport.selector !== ""}
-			<a href="/analysis?url={targetUrl}&selector={encodeURIComponent(viewport.selector)}">Analyze</a>
-		{/if}
-	{/each}
+{#if result}
+	<h2>Screenshot {result.resolution}</h2>
+	<p>Found banner: {result.selector === "" ? "❌ No" : "✅ Yes"}</p>
+	<img src="data:image/png;base64,{result.screenshot}" alt="Screenshot" />
+	{#if result.selector !== ""}
+		Analyze button here
+		<!-- <a href="/analysis?url={targetUrl}&selector={encodeURIComponent(viewport.selector)}">Analyze</a> -->
+	{/if}
 {:else if isLoading}
+	<h1>Looking for cookie banners</h1>
 	<h2>Loading...</h2>
 {:else if errorMessage.length > 0}
 	<h2>Error</h2>
 	<p>{errorMessage}</p>
-	<a href="/analysis?url={targetUrl}">Try again</a>
+	Try again button here
+	<!-- <a href="/analysis?url={targetUrl}">Try again</a> -->
 {/if}
 
 <style>
