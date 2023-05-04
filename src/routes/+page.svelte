@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ResolutionPicker from "$lib/components/ResolutionPicker.svelte";
+	import buildSearchParams from "$lib/utils/buildSearchParams";
 
 	let url = "";
 
@@ -9,19 +10,10 @@
 
 	function goToBanner(e: FormSubmitEvent) {
 		const data = new FormData(e.currentTarget);
-		const searchParams = new URLSearchParams();
-		for (const [name, value] of data.entries()) {
-			console.log(name, value);
-			if (typeof value === "string") {
-				searchParams.append(name, value);
-			} else {
-				console.warn(`Skipping non-string value for field ${name}: ${value}`);
-			}
-		}
+		const params = buildSearchParams(data);
 
 		// TODO: Validation on url?
-
-		window.location.href = `/banner?` + searchParams;
+		window.location.href = `/banner?` + params;
 	}
 </script>
 

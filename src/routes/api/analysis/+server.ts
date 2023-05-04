@@ -4,7 +4,7 @@ import getErrorMessage from "$lib/utils/getErrorMessage";
 import Db from "$lib/server/db/Db";
 import isValidUrl from "$lib/utils/getURL";
 import { getUniqueCssSelector } from "$lib/server/puppeteerHelpers";
-import type { ElementHandle, Page, Protocol } from "puppeteer";
+import type { ElementHandle, Page } from "puppeteer";
 import { encode } from "gpt-3-encoder";
 import { BannerSizeAnalyser, type BannerSizeAnalyserParams } from "$lib/server/analysers/BannerSizeAnalyser";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
@@ -27,8 +27,6 @@ import { PurposeAnalyser, type PurposeAnalyserParams } from "$lib/server/analyse
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
-
-let desktopPage: Page;
 
 const systemPrompt = `You are a legal assistant and your job is to:
 
@@ -77,73 +75,43 @@ const longestPossibleOutput = 50;
 
 export const GET = (async (request): Promise<Response> => {
 	console.log(request.url.searchParams);
-	let urlString = request.url.searchParams.get("url") ?? "";
-	if (!urlString.startsWith("http")) {
-		urlString = `https://${urlString}`;
-	}
-
+	const urlString = request.url.searchParams.get("url") ?? "";
 	const selector = request.url.searchParams.get("selector") ?? "";
+	const isMobile = request.url.searchParams.get("isMobile") === "on" ?? false;
+	const width = parseInt(request.url.searchParams.get("width") ?? "1920");
+	const height = parseInt(request.url.searchParams.get("height") ?? "1080");
 
-	if (!isValidUrl(urlString)) {
-		return new Response("Invalid URL", { status: 400 });
-	}
-
-	if (!selector) {
-		return new Response("Selector is required", { status: 400 });
-	}
+	if (!isValidUrl(urlString)) return new Response("Invalid URL", { status: 400 });
+	if (!selector) return new Response("Selector is required", { status: 400 });
 
 	const url = new URL(urlString);
-
+	const page = isMobile ? await getMobilePage(width, height, url) : await getDesktopPage(width, height, url);
 	try {
 		const database = new Db();
 		await database.init();
-		const results = await getResults(url, selector, database);
+		const results = await getResults(selector, database, page);
 		return new Response(JSON.stringify(results));
 	} catch (e) {
 		// TODO: Do not return the error message to the client for security reasons
 		console.error(e);
 		return new Response(getErrorMessage(e), { status: 500 });
+	} finally {
+		await page.close();
 	}
 }) satisfies RequestHandler;
 
-async function getResults(url: URL, selector: string, database: Db): Promise<unknown[]> {
-	const results: unknown[] = [];
-
-	// We have two separate pages instead of one that we resize, because according to
-	// https://pptr.dev/api/puppeteer.page.setviewport a lot of websites don't expect
-	// phones to change viewport size
-
-	// On second thought, maybe we can start with a desktop page and then resize it to
-	// mobile size? It would be a performance improvement and probably work (?)
-	desktopPage = await getDesktopPage();
-	const mobilePage = await getMobilePage();
-
-	const requestTimeStart = performance.now();
-	await desktopPage.goto(url.href, { waitUntil: "networkidle0" });
-	await mobilePage.goto(url.href, { waitUntil: "networkidle0" });
-	const requestTimeMs = performance.now() - requestTimeStart;
-
+// TODO: Properly type this file and funcitions
+async function getResults(selector: string, database: Db, page: Page): Promise<AnalysisResult<any>[] | null> {
 	// Add delay for debugging purposes
 	// This is hardcoded now, but Oliver had a great idea:
 	// we should probably retry once after a delay of 5-10s if the immediate scan did not find anything.
 	// But we should only to this if the DOM has changed when waiting.
 	await new Promise((r) => setTimeout(r, 5000));
 
-	results.push({ test: `Analysis is TODO, selector: ${selector}`, hi: [], compile: requestTimeMs });
-	// for (const finder of getBannerFinders()) {
-	// 	const desktopResult = await finder.findBanner(desktopPage);
-	// 	const mobileResult = await finder.findBanner(mobilePage);
-
-	// 	const analysisResult = new AnalysisResult(finder.constructor.name, [desktopResult, mobileResult], requestTimeMs);
-	// 	results.push(analysisResult);
-	// }
-
-	const analysisResults = await analyzeBanner(selector, database);
+	const analysisResults = await analyzeBanner(selector, database, page);
 	console.log(JSON.stringify(analysisResults));
-	await desktopPage.close();
-	await mobilePage.close();
 
-	return results;
+	return analysisResults;
 }
 
 /**
@@ -152,7 +120,7 @@ async function getResults(url: URL, selector: string, database: Db): Promise<unk
  * @param {string} selector - CSS selector to find the cookie banner.
  * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
  */
-async function analyzeBanner(selector: string, database: Db): Promise<AnalysisResult<any>[] | null> {
+async function analyzeBanner(selector: string, database: Db, page: Page): Promise<AnalysisResult<any>[] | null> {
 	// TODO: Left to implement are the following:
 	/**
 	 * {
@@ -180,13 +148,13 @@ async function analyzeBanner(selector: string, database: Db): Promise<AnalysisRe
 
 	const analysisResults: AnalysisResult<any>[] = [];
 
-	const desktopBanner = await desktopPage.$(selector);
+	const desktopBanner = await page.$(selector);
 
 	if (!desktopBanner) {
 		return null; // TODO: Implement error handling if banner can't be found.
 	}
 
-	const cookies = await desktopPage.cookies();
+	const cookies = await page.cookies();
 	const cookiesBeforeConsentResult = new CookiesBeforeConsentAnalyser(
 		"cookies-before-consent",
 		"Cookies Before Consent",
@@ -204,13 +172,13 @@ async function analyzeBanner(selector: string, database: Db): Promise<AnalysisRe
 	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", "Design");
 	const bannerSizeParams: BannerSizeAnalyserParams = {
 		banner: desktopBanner,
-		page: desktopPage,
+		page: page,
 	};
 
 	await bannerSizeResult.analyze(bannerSizeParams);
 	analysisResults.push(bannerSizeResult);
 
-	const cookieBannerTextElements = await getCookieBannerTextElements(selector, desktopPage);
+	const cookieBannerTextElements = await getCookieBannerTextElements(selector, page);
 
 	const colorContrastResult = new ColorContrastAnalyser(
 		"color-contrast",
@@ -278,7 +246,7 @@ async function analyzeBanner(selector: string, database: Db): Promise<AnalysisRe
 	const languageParams: LanguageAnalyserParams = {
 		gptResult: gptResultMerged,
 		bannerSelector: selector,
-		page: desktopPage,
+		page: page,
 	};
 
 	await languageResult.analyze(languageParams);
@@ -299,7 +267,7 @@ async function analyzeBanner(selector: string, database: Db): Promise<AnalysisRe
 	);
 	const rejectButtonLayerParams: RejectButtonLayerAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
-		page: desktopPage,
+		page: page,
 	};
 
 	await rejectButtonLayerResult.analyze(rejectButtonLayerParams);
@@ -310,7 +278,7 @@ async function analyzeBanner(selector: string, database: Db): Promise<AnalysisRe
 		rejectButtonElement: rejectButtonElement,
 		acceptButtonElement: acceptButtonElement,
 		rejectButtonLayerAnalyserStatus: rejectButtonLayerResult.status,
-		page: desktopPage,
+		page: page,
 	};
 
 	await nudgingResult.analyze(nudgingParams);
@@ -456,7 +424,7 @@ async function getCookieBannerTextElements(
 						tag: await ancestorElement.evaluate((el) => el.tagName.toLowerCase()),
 						text: textContent,
 						element: ancestorElement,
-						selector: await getUniqueCssSelector(ancestorElement as ElementHandle<HTMLElement>, desktopPage),
+						selector: await getUniqueCssSelector(ancestorElement as ElementHandle<HTMLElement>, page),
 					});
 					index++;
 				}

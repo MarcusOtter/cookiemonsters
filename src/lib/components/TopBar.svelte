@@ -1,12 +1,5 @@
 <header>
 	<a href="/">CrumblyConsent</a>
-	<!-- <nav>
-		<ul>
-			<li><a href="/about">About</a></li>
-			<li><a href="/privacy">Privacy policy</a></li>
-			<li><a href="https://github.com/MarcusOtter/crumbly-consent">GitHub</a></li>
-		</ul>
-	</nav> -->
 </header>
 
 <style>
@@ -15,22 +8,6 @@
 		display: flex;
 		align-items: center;
 	}
-
-	/* ul {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: flex;
-	}
-
-	li {
-		display: inline-block;
-		margin-left: calc(20px + 0.75em);
-	}
-
-	nav {
-		margin-left: auto;
-	} */
 
 	a {
 		text-decoration: none;

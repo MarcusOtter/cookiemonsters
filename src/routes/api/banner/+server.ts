@@ -7,7 +7,6 @@ import getChecksum from "$lib/utils/getChecksum";
 import isValidUrl from "$lib/utils/getURL";
 import { json, error } from "@sveltejs/kit";
 import BannerFindResponse from "$lib/contracts/BannerFindResponse";
-import { getViewportSize } from "$lib/server/puppeteerHelpers";
 import BannerSelector from "$lib/server/db/BannerSelector";
 import MarcusUltraFinder from "$lib/server/finders/MarcusUltraFinder";
 
@@ -27,7 +26,6 @@ export const GET = (async (request): Promise<Response> => {
 
 	const url = new URL(urlString);
 	const page = isMobile ? await getMobilePage(width, height, url) : await getDesktopPage(width, height, url);
-	const viewportSize = getViewportSize(page);
 
 	try {
 		const database = new Db();
@@ -45,14 +43,16 @@ export const GET = (async (request): Promise<Response> => {
 		// If we didn't find a selector based on full URL, we should try the hostname (subdomain + domain + TLD)
 		if (!selector) {
 			selector = await database.getSelector({ hostname: url.hostname });
+			selector && console.log("Cache hit selector: ", selector.text);
 			if (!(await isActiveSelector(selector, page))) {
+				console.log("Inactive selector ^");
 				selector = undefined;
 			}
 		}
 
 		if (selector && (await isActiveSelector(selector, page))) {
 			const screenshot = await getScreenshot(selector.text, page);
-			return json(new BannerFindResponse(screenshot, selector.text, viewportSize, url.href, isMobile));
+			return json(new BannerFindResponse(screenshot, selector.text, url.href, isMobile, width, height));
 		}
 
 		// One finder for the demo, either one should work
@@ -76,7 +76,7 @@ export const GET = (async (request): Promise<Response> => {
 			screenshot = (await page.screenshot({ encoding: "base64" })) as string;
 		}
 
-		return json(new BannerFindResponse(screenshot, newSelector, viewportSize, url.href, isMobile));
+		return json(new BannerFindResponse(screenshot, newSelector, url.href, isMobile, width, height));
 	} catch (e) {
 		// TODO: Do not return the error message to the client for security reasons
 		// Can print table names and etc

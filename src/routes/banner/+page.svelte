@@ -2,12 +2,13 @@
 	import { onMount } from "svelte";
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 	import type BannerFindResponse from "$lib/contracts/BannerFindResponse";
+	import spinner from "$lib/assets/spinner.svg";
+	import buildSearchParams from "$lib/utils/buildSearchParams";
 
 	let result: BannerFindResponse;
 	let isLoading = false;
 	let params: URLSearchParams;
 	let errorMessage = "";
-	let selectedResultIndex = 0;
 
 	onMount(async () => {
 		params = new URLSearchParams(window.location.search);
@@ -42,37 +43,117 @@
 	}
 </script>
 
-<a href="/">Back to home</a>
+<!-- <a href="/">Back to home</a> -->
 
-{#if result}
-	<h2>Screenshot {result.resolution}</h2>
-	<p>Found banner: {result.selector === "" ? "❌ No" : "✅ Yes"}</p>
-	<img src="data:image/png;base64,{result.screenshot}" alt="Screenshot" />
-	{#if result.selector !== ""}
-		Analyze button here
-		<!-- <a href="/analysis?url={targetUrl}&selector={encodeURIComponent(viewport.selector)}">Analyze</a> -->
+<div class="output">
+	{#if result && result.selector}
+		<h1>Cookie banner found</h1>
+		<span class="subtitle">Does this look right?</span>
+		<img src="data:image/png;base64,{result.screenshot}" alt="Screenshot" />
+		<p>In the image above, only the cookie banner should be visible.</p>
+		<p>
+			If the image contains any other elements or only partially covers the cookie banner, please select "This does not
+			look right".
+		</p>
+		<div class="btns">
+			<a href="#">This does not look right (TODO)</a>
+			<a
+				class="primary"
+				href="/analysis?{buildSearchParams({
+					url: result.url,
+					isMobile: result.isMobile,
+					selector: result.selector,
+					width: result.width,
+					height: result.height,
+				})}">Looks correct</a
+			>
+		</div>
+	{:else if result}
+		<h1>Could not find cookie banner</h1>
+		<span class="subtitle">Does this image contain a cookie banner?</span>
+		<img src="data:image/png;base64,{result.screenshot}" alt="Screenshot" />
+		<p>
+			Our banner finder has failed to find a cookie banner on <a href={result.url}>{result.url}</a>. Either there is no
+			cookie banner on the website, or we could not find it for some reason.
+		</p>
+		<p>If there is a cookie banner in this image, proceed with manually configuration.</p>
+
+		<div class="btns">
+			<a href="/">Start over</a>
+			<a class="primary" href="#">Manual configuration (TODO)</a>
+		</div>
+	{:else if isLoading}
+		<h1>Looking for cookie banners</h1>
+		<span class="subtitle">This can take a few seconds</span>
+		<img class="spinner" src={spinner} alt="Loading..." />
+	{:else if errorMessage.length > 0}
+		<h1>Something went wrong</h1>
+		<p>{errorMessage}</p>
+		<p>Try again button here later :)</p>
+		<!-- <a href="/analysis?url={targetUrl}">Try again</a> -->
 	{/if}
-{:else if isLoading}
-	<h1>Looking for cookie banners</h1>
-	<h2>Loading...</h2>
-{:else if errorMessage.length > 0}
-	<h2>Error</h2>
-	<p>{errorMessage}</p>
-	Try again button here
-	<!-- <a href="/analysis?url={targetUrl}">Try again</a> -->
-{/if}
+</div>
 
 <style>
 	h1 {
 		margin-block-start: 32px;
+		font-size: 2.5rem;
 	}
 
-	h2 {
-		margin-block-start: 48px;
+	.subtitle {
+		font-size: 1.5rem;
 	}
 
-	select {
-		margin-block-start: 16px;
-		color: black;
+	p {
+		margin-block-start: 1em;
+	}
+
+	.output {
+		text-align: center;
+		display: flex;
+		align-items: center;
+		flex-direction: column;
+		font-size: 1.5rem;
+	}
+
+	.btns {
+		margin-top: 32px;
+		display: flex;
+		gap: 16px;
+	}
+
+	.btns a {
+		padding: 20px 40px;
+		background-color: hsl(221, 24%, 38%);
+		border-radius: 26px;
+		text-decoration: none;
+		display: inline;
+	}
+
+	.btns a.primary {
+		background-color: hsl(221, 71%, 40%);
+	}
+
+	.btns a:hover {
+		filter: brightness(120%);
+	}
+
+	.output img {
+		margin: 36px 0;
+	}
+
+	.spinner {
+		margin: 16px auto;
+		width: 32px;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>
