@@ -51,6 +51,15 @@
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Passed)) return AnalysisStatus.Passed;
 		return AnalysisStatus.Skipped;
 	}
+
+	function showDetails(i: number) {
+		const detailsBox = document.getElementsByClassName(`extra-details-${i}`)[0] as HTMLElement;
+		const detailsButton = document.getElementsByClassName(`extra-details-button-${i}`)[0] as HTMLElement;
+		if (detailsBox != null && detailsButton != null) {
+			detailsBox.style.display = "block";
+			detailsButton.style.display = "none";
+		}
+	}
 </script>
 
 <div class="output">
@@ -84,7 +93,7 @@
 			{#each categories as category}
 				<h2 id={AnalysisCategory[category]}>{AnalysisCategory[category]}</h2>
 				<div class="category-results {AnalysisStatus[getStatusForCategory(category)].toLowerCase()}">
-					{#each results.filter((res) => res.category === category) as result}
+					{#each results.filter((res) => res.category === category) as result, i}
 						<div class="result {AnalysisStatus[result.status].toLowerCase()}">
 							<h3>{result.name}</h3>
 							<p>{result.description === "" ? "Description missing" : result.description}</p>
@@ -92,8 +101,12 @@
 							<p>{result.resultSummary}</p>
 
 							{#if result.details}
-								<h4>Details</h4>
-								<pre>{result.details}</pre>
+								<button on:click|once={() => showDetails(i)} class="extra-details-button-{i}">Show Details</button>
+								<div class="extra-details-{i}">
+									<hr />
+									<h4>Details</h4>
+									<pre>{result.details}</pre>
+								</div>
 							{/if}
 						</div>
 					{/each}
@@ -256,5 +269,30 @@
 
 	.box h1 {
 		font-size: 1.5rem;
+	}
+
+	div[class^="extra-details-"] {
+		display: none;
+	}
+
+	.result button {
+		background: #1e1e23;
+		border: solid 1px;
+		border-color: #44464a;
+		border-radius: 6px;
+		padding: 5px 15px;
+		display: block;
+		position: absolute;
+		bottom: -6px;
+		left: 50%;
+		transform: translateX(-50%);
+		cursor: pointer;
+	}
+
+	hr {
+		margin-top: 14px;
+		border-width: 0;
+		border-top-width: 1px;
+		opacity: 0.3;
 	}
 </style>
