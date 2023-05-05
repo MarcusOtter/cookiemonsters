@@ -159,7 +159,12 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await cookiesBeforeConsentResult.analyze(cookiesBeforeConsentParams);
 	analysisResults.push(cookiesBeforeConsentResult);
 
-	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", AnalysisCategory.Design);
+	const bannerSizeResult = new BannerSizeAnalyser(
+		"banner-size",
+		"Banner Size",
+		"Checks how large percentage of the screen the banner takes up.",
+		AnalysisCategory.Design,
+	);
 	const bannerSizeParams: BannerSizeAnalyserParams = {
 		banner: banner,
 		page: page,
@@ -263,7 +268,12 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await rejectButtonLayerResult.analyze(rejectButtonLayerParams);
 	analysisResults.push(rejectButtonLayerResult);
 
-	const nudgingResult = new NudgingAnalyser("nudging", "Nudging", "", AnalysisCategory.Design);
+	const nudgingResult = new NudgingAnalyser(
+		"nudging",
+		"Nudging",
+		"Checks whether the cookie banner nudges the user to accept/decline.",
+		AnalysisCategory.Design,
+	);
 	const nudgingParams: NudgingAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
 		acceptButtonElement: acceptButtonElement,
@@ -274,7 +284,12 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await nudgingResult.analyze(nudgingParams);
 	analysisResults.push(nudgingResult);
 
-	const blockingResult = new BlockingAnalyser("blocking", "Blocking", "", AnalysisCategory.Design);
+	const blockingResult = new BlockingAnalyser(
+		"blocking",
+		"Blocking",
+		"Checks whether the cookie banner is blocking the page from being used.",
+		AnalysisCategory.Design,
+	);
 	const blockingResultParams: BlockingAnalyserParams = {
 		page: page,
 		cookieBanner: banner,
