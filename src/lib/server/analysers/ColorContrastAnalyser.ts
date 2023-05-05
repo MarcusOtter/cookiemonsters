@@ -2,6 +2,8 @@ import type { ElementHandle } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import Color from "color";
 import WCAG from "wcag-contrast";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 export interface ColorContrastAnalyserParams {
 	cookieBannerTextElements: {
@@ -19,17 +21,17 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -41,7 +43,7 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 
 		if (failedContrastElements.length > 0) {
 			this.resultSummary = `${failedContrastElements.length} of the cookie banner's text's contrast is insufficient (WCAG's AA minimum contrast).`;
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 			this.details = `Elements with contrast below AA:`;
 
 			for (const contrast of failedContrastElements) {
@@ -55,7 +57,7 @@ Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Co
 			}
 		} else if (aaContrastElements.length > 0) {
 			this.resultSummary = `${aaContrastElements.length} of the cookie banner's text's contrast has a contrast rating of AA (WCAG's minimum contrast), but should be AAA.`;
-			this.status = "Warning";
+			this.status = AnalysisStatus.Warning;
 			this.details = `Elements with contrast below AAA:`;
 
 			for (const contrast of aaContrastElements) {
@@ -69,7 +71,7 @@ Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Co
 			}
 		} else {
 			this.resultSummary = "Cookie banner contains no elements with insufficient contrast.";
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		}
 	}
 }

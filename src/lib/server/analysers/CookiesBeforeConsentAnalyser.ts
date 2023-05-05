@@ -2,6 +2,8 @@ import type { Protocol } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { CookieResult } from "$lib/CookieResult";
 import type Db from "../db/Db";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 export interface CookiesBeforeConsentAnalyserParams {
 	cookies: Protocol.Network.Cookie[];
@@ -12,17 +14,17 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -51,7 +53,7 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 			this.resultSummary = `Found ${knownUnnecessaryCookies.length} known unnecessary cookie(s) ${
 				unknownCookies.length > 0 ? `and ${unknownCookies.length} unknown cookie(s) ` : ""
 			}before consent choice.`;
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 			this.details += `Known unnecessary cookies:`;
 
 			for (const cookie of knownUnnecessaryCookies) {
@@ -74,7 +76,7 @@ Name: ${cookie.ClientCookie.name}
 			}
 		} else if (unknownCookies.length > 0) {
 			this.resultSummary = `Found ${unknownCookies.length} unknown cookie(s) before consent choice. The necessity of these cookies should be manually checked.`;
-			this.status = "Warning";
+			this.status = AnalysisStatus.Warning;
 			this.details = `Unknown cookies:`;
 			for (const cookie of unknownCookies) {
 				this.details += `
@@ -88,7 +90,7 @@ Name: ${cookie.ClientCookie.name}
 				this.resultSummary = "No cookies were set before consent choice.";
 			}
 
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		}
 
 		if (knownNecessaryCookies.length > 0) {

@@ -28,6 +28,9 @@ import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
+import { json } from "@sveltejs/kit";
+import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
+import AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 const systemPrompt = `You are a legal assistant and your job is to:
 
@@ -78,7 +81,6 @@ const apiTotalTokenLimit = 4000;
 const longestPossibleOutput = 50;
 
 export const GET = (async (request): Promise<Response> => {
-	console.log(request.url.searchParams);
 	const urlString = request.url.searchParams.get("url") ?? "";
 	const selector = request.url.searchParams.get("selector") ?? "";
 	const isMobile = request.url.searchParams.get("isMobile") === "on" ?? false;
@@ -105,12 +107,14 @@ export const GET = (async (request): Promise<Response> => {
 }) satisfies RequestHandler;
 
 // TODO: Properly type this file and funcitions
-async function getResults(selector: string, database: Db, page: Page): Promise<AnalysisResult<any>[] | null> {
+async function getResults(selector: string, database: Db, page: Page): Promise<BannerAnalysisResponse[]> {
 	// Add delay for debugging purposes
 	// This is hardcoded now, but Oliver had a great idea:
 	// we should probably retry once after a delay of 5-10s if the immediate scan did not find anything.
 	// But we should only to this if the DOM has changed when waiting.
+	console.log(new Date());
 	await new Promise((r) => setTimeout(r, 5000));
+	console.log(new Date());
 
 	const analysisResults = await analyzeBanner(selector, database, page);
 	console.log(JSON.stringify(analysisResults));
@@ -124,7 +128,7 @@ async function getResults(selector: string, database: Db, page: Page): Promise<A
  * @param {string} selector - CSS selector to find the cookie banner.
  * @returns {Promise<Object>} An object containing information about the cookie banner, such as the reject button status and the nudging status.
  */
-async function analyzeBanner(selector: string, database: Db, page: Page): Promise<AnalysisResult<any>[] | null> {
+async function analyzeBanner(selector: string, database: Db, page: Page): Promise<BannerAnalysisResponse[]> {
 	// TODO: Left to implement are the following:
 	/*
 	- reword implied consent prompt
@@ -136,7 +140,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	const desktopBanner = await page.$(selector);
 
 	if (!desktopBanner) {
-		return null; // TODO: Implement error handling if banner can't be found.
+		return []; // TODO: Implement error handling if banner can't be found.
 	}
 
 	const cookies = await page.cookies();
@@ -144,7 +148,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"cookies-before-consent",
 		"Cookies Before Consent",
 		"Checks whether cookies are set before consent is obtained from the website's user.",
-		"Functionality",
+		AnalysisCategory.Functionality,
 	);
 	const cookiesBeforeConsentParams: CookiesBeforeConsentAnalyserParams = {
 		cookies: cookies,
@@ -154,7 +158,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await cookiesBeforeConsentResult.analyze(cookiesBeforeConsentParams);
 	analysisResults.push(cookiesBeforeConsentResult);
 
-	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", "Design");
+	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", AnalysisCategory.Design);
 	const bannerSizeParams: BannerSizeAnalyserParams = {
 		banner: desktopBanner,
 		page: page,
@@ -169,7 +173,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"color-contrast",
 		"Color Contrast",
 		"Checks that the cookie banner follows accessibility standards in color contrast.",
-		"Accessibility",
+		AnalysisCategory.Accessibility,
 	);
 	const colorContrastParams: ColorContrastAnalyserParams = {
 		cookieBannerTextElements: cookieBannerTextElements,
@@ -187,7 +191,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"clarity",
 		"Text Clarity",
 		"Checks whether the text does not contain legal jargon and that it is generally clear.",
-		"Information",
+		AnalysisCategory.Information,
 	);
 	const textClarityParams: TextClarityAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -200,7 +204,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"purpose",
 		"Cookie Purpose",
 		"Checks whether cookies' purpose is described clearly.",
-		"Information",
+		AnalysisCategory.Information,
 	);
 	const purposeParams: PurposeAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -213,7 +217,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"implied-consent",
 		"Implied Consent",
 		"Checks that the cookie banner doesn't assume implied consent.",
-		"Functionality",
+		AnalysisCategory.Functionality,
 	);
 	const impliedConsentParams: ImpliedConsentAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -226,7 +230,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"language-consistency",
 		"Language Consistency",
 		"Checks whether the cookie banner's language is the same as the page's.",
-		"Accessibility",
+		AnalysisCategory.Accessibility,
 	);
 	const languageParams: LanguageAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -248,7 +252,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"reject-button-layer",
 		"Reject Button Layer",
 		"Checks whether a button to reject all cookies exists and how difficult it is to get to.",
-		"Functionality",
+		AnalysisCategory.Functionality,
 	);
 	const rejectButtonLayerParams: RejectButtonLayerAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
@@ -258,7 +262,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await rejectButtonLayerResult.analyze(rejectButtonLayerParams);
 	analysisResults.push(rejectButtonLayerResult);
 
-	const nudgingResult = new NudgingAnalyser("nudging", "Nudging", "", "Design");
+	const nudgingResult = new NudgingAnalyser("nudging", "Nudging", "", AnalysisCategory.Design);
 	const nudgingParams: NudgingAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
 		acceptButtonElement: acceptButtonElement,
@@ -269,7 +273,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await nudgingResult.analyze(nudgingParams);
 	analysisResults.push(nudgingResult);
 
-	const blockingResult = new BlockingAnalyser("blocking", "Blocking", "", "Design");
+	const blockingResult = new BlockingAnalyser("blocking", "Blocking", "", AnalysisCategory.Design);
 	const blockingResultParams: BlockingAnalyserParams = {
 		page: page,
 		cookieBanner: desktopBanner,
@@ -278,6 +282,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await blockingResult.analyze(blockingResultParams);
 	analysisResults.push(blockingResult);
 
+	// TODO: Will fix later... /Marcus
 	return analysisResults;
 }
 

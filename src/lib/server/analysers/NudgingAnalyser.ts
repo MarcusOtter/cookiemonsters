@@ -1,3 +1,5 @@
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { ElementHandle, Page } from "puppeteer";
 
@@ -20,7 +22,7 @@ export interface NudgingAnalyserParams {
 				selector: string;
 		  }
 		| undefined;
-	rejectButtonLayerAnalyserStatus: string;
+	rejectButtonLayerAnalyserStatus: AnalysisStatus;
 	page: Page;
 }
 
@@ -28,35 +30,39 @@ export class NudgingAnalyser implements AnalysisResult<NudgingAnalyserParams> {
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
 
 	async analyze(params: NudgingAnalyserParams) {
 		this.resultSummary = `This check was skipped due to the accept/decline button missing or being on different layers.`;
-		this.status = "Skipped";
+		this.status = AnalysisStatus.Skipped;
 
-		if (params.rejectButtonElement && params.acceptButtonElement && params.rejectButtonLayerAnalyserStatus == "Pass") {
+		if (
+			params.rejectButtonElement &&
+			params.acceptButtonElement &&
+			params.rejectButtonLayerAnalyserStatus == AnalysisStatus.Passed
+		) {
 			// Reject Pass check so that it isn't on another layer.
 			const nudgingCheck = await checkNudging(params.rejectButtonElement, params.acceptButtonElement, params.page);
 			if (nudgingCheck == "pass") {
 				this.resultSummary = "The cookie banner does not nudge the user's consent decision by design.";
-				this.status = "Pass";
+				this.status = AnalysisStatus.Passed;
 			} else if (nudgingCheck == "warning") {
 				this.resultSummary =
 					"The cookie banner seems to nudge the user's consent decision by differentiating the styling of the accept/decline buttons.";
-				this.status = "Warning";
+				this.status = AnalysisStatus.Warning;
 			}
 		}
 	}

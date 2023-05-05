@@ -1,6 +1,8 @@
 import type { ElementHandle, Page } from "puppeteer";
 import { getViewportSizeIndividually } from "../puppeteerHelpers";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 export interface BannerSizeAnalyserParams {
 	banner: ElementHandle<Element>;
@@ -11,17 +13,17 @@ export class BannerSizeAnalyser implements AnalysisResult<BannerSizeAnalyserPara
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -31,9 +33,9 @@ export class BannerSizeAnalyser implements AnalysisResult<BannerSizeAnalyserPara
 
 		this.resultSummary = `The cookie banner takes up ${Math.round(bannerSizePercentage)}% of the screen.`;
 		if (Math.round(bannerSizePercentage) >= 25) {
-			this.status = "Warning";
+			this.status = AnalysisStatus.Warning;
 		} else {
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		}
 	}
 }

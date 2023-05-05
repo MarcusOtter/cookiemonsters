@@ -4,6 +4,7 @@
 	import type BannerFindResponse from "$lib/contracts/BannerFindResponse";
 	import spinner from "$lib/assets/spinner.svg";
 	import buildSearchParams from "$lib/utils/buildSearchParams";
+	import Loading from "$lib/components/Loading.svelte";
 
 	let result: BannerFindResponse;
 	let isLoading = false;
@@ -43,8 +44,6 @@
 	}
 </script>
 
-<!-- <a href="/">Back to home</a> -->
-
 <div class="output">
 	{#if result && result.selector}
 		<h1>Cookie banner found</h1>
@@ -83,9 +82,7 @@
 			<a class="primary" href="#">Manual configuration (TODO)</a>
 		</div>
 	{:else if isLoading}
-		<h1>Looking for cookie banners</h1>
-		<span class="subtitle">This can take a few seconds</span>
-		<img class="spinner" src={spinner} alt="Loading..." />
+		<Loading title="Looking for a cookie banner" subtitle="This will take a few seconds" />
 	{:else if errorMessage.length > 0}
 		<h1>Something went wrong</h1>
 		<p>{errorMessage}</p>
@@ -140,20 +137,5 @@
 
 	.output img {
 		margin: 36px 0;
-	}
-
-	.spinner {
-		margin: 16px auto;
-		width: 32px;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
-		to {
-			transform: rotate(360deg);
-		}
 	}
 </style>

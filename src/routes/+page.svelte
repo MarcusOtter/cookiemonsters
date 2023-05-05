@@ -60,7 +60,6 @@
 
 	.left p {
 		font-size: 1.35rem;
-		/* color: hsl(0, 0%, 80%); */
 		font-weight: 400;
 		margin-block-start: 1.5em;
 	}
@@ -72,7 +71,7 @@
 	form {
 		border-radius: 16px;
 		padding: 32px 64px;
-		background: linear-gradient(180deg, hsl(231, 9%, 15%), hsl(228, 10%, 10%));
+		background: linear-gradient(180deg, hsl(231, 9%, 15%), hsl(228, 10%, 10%)) 0% 0% no-repeat padding-box;
 		text-align: center;
 		border: 2px solid hsla(0, 0%, 100%, 0.05);
 	}
@@ -134,6 +133,7 @@
 
 		form {
 			background: transparent;
+			border-color: transparent;
 			padding: 0;
 		}
 

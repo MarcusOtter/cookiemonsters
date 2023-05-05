@@ -1,3 +1,5 @@
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { GPTResult } from "../GPTResult";
 
@@ -9,17 +11,17 @@ export class ImpliedConsentAnalyser implements AnalysisResult<ImpliedConsentAnal
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -27,10 +29,10 @@ export class ImpliedConsentAnalyser implements AnalysisResult<ImpliedConsentAnal
 	async analyze(params: ImpliedConsentAnalyserParams) {
 		if (params.gptResult["implied-consent"]) {
 			this.resultSummary = `The cookie banner contains wording that suggests that the user has no say in consent i.e. Implied consent.`;
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 		} else {
 			this.resultSummary = `The cookie banner does not seem to contain wording of implied consent.`;
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		}
 	}
 }

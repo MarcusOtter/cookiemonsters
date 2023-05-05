@@ -27,6 +27,9 @@ export const GET = (async (request): Promise<Response> => {
 	const url = new URL(urlString);
 	const page = isMobile ? await getMobilePage(width, height, url) : await getDesktopPage(width, height, url);
 
+	// We should only do this delay if not found immediately probably :)
+	await new Promise((r) => setTimeout(r, 5000));
+
 	try {
 		const database = new Db();
 		await database.init();

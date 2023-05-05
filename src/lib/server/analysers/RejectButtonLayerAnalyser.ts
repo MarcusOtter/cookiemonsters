@@ -1,5 +1,7 @@
 import type { ElementHandle, Page } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 export interface RejectButtonLayerAnalyserParams {
 	rejectButtonElement:
@@ -18,17 +20,17 @@ export class RejectButtonLayerAnalyser implements AnalysisResult<RejectButtonLay
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -36,17 +38,17 @@ export class RejectButtonLayerAnalyser implements AnalysisResult<RejectButtonLay
 	async analyze(params: RejectButtonLayerAnalyserParams) {
 		if (params.rejectButtonElement) {
 			this.resultSummary = `A button to Reject All cookies was found within the cookie banner, but not on the first layer.`;
-			this.status = "Warning";
+			this.status = AnalysisStatus.Warning;
 
 			const rejectButtonDOMElement = await params.page.$(params.rejectButtonElement.selector);
 
 			if (rejectButtonDOMElement && (await rejectButtonDOMElement.isIntersectingViewport())) {
 				this.resultSummary = `A button to Reject All cookies was found on the first layer of the cookie banner.`;
-				this.status = "Pass";
+				this.status = AnalysisStatus.Passed;
 			}
 		} else {
 			this.resultSummary = `A button to Reject All cookies was not found within the cookie banner.`;
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 		}
 	}
 }

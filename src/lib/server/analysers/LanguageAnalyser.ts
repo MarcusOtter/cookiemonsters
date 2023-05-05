@@ -2,6 +2,8 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { Page } from "puppeteer";
 import type { GPTResult } from "../GPTResult";
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
 export interface LanguageAnalyserParams {
 	gptResult: GPTResult;
@@ -13,17 +15,17 @@ export class LanguageAnalyser implements AnalysisResult<LanguageAnalyserParams> 
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -31,10 +33,10 @@ export class LanguageAnalyser implements AnalysisResult<LanguageAnalyserParams> 
 	async analyze(params: LanguageAnalyserParams) {
 		if (await checkLanguageDifference(params.gptResult["lang"], params.bannerSelector, params.page)) {
 			this.resultSummary = "The cookie banner has the same language as the website.";
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		} else {
 			this.resultSummary = "The cookie banner's language is not the same as the website's.";
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 		}
 	}
 }

@@ -1,5 +1,7 @@
+import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
-import type { ElementHandle, Frame, Page } from "puppeteer";
+import type { ElementHandle, Page } from "puppeteer";
 
 export interface BlockingAnalyserParams {
 	page: Page;
@@ -23,17 +25,17 @@ export class BlockingAnalyser implements AnalysisResult<BlockingAnalyserParams> 
 	id: string;
 	name: string;
 	description: string;
-	category: string;
-	status: "Pass" | "Fail" | "Warning" | "Skipped" | "Undefined";
+	category: AnalysisCategory;
+	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: string) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
 		this.category = category;
-		this.status = "Undefined";
+		this.status = AnalysisStatus.Skipped;
 		this.resultSummary = "";
 		this.details = "";
 	}
@@ -51,7 +53,7 @@ export class BlockingAnalyser implements AnalysisResult<BlockingAnalyserParams> 
 			}),
 		).then((results) => results.filter(Boolean));
 
-		const viewport = await params.page.viewport();
+		const viewport = params.page.viewport();
 		const quarterWidth = viewport ? viewport.width / 2 : 0;
 		const quarterHeight = viewport ? viewport.height / 2 : 0;
 
@@ -90,10 +92,10 @@ export class BlockingAnalyser implements AnalysisResult<BlockingAnalyserParams> 
 
 		if (clickResults.filter((el) => el.isClickable == true).length > 0) {
 			this.resultSummary = `The cookie banner does not seem to block the whole page from use.`;
-			this.status = "Pass";
+			this.status = AnalysisStatus.Passed;
 		} else {
 			this.resultSummary = `The cookie banner seems to block the page from use.`;
-			this.status = "Fail";
+			this.status = AnalysisStatus.Failed;
 		}
 	}
 }
