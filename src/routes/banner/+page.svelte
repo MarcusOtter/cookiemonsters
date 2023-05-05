@@ -2,7 +2,6 @@
 	import { onMount } from "svelte";
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 	import type BannerFindResponse from "$lib/contracts/BannerFindResponse";
-	import spinner from "$lib/assets/spinner.svg";
 	import buildSearchParams from "$lib/utils/buildSearchParams";
 	import Loading from "$lib/components/Loading.svelte";
 
@@ -10,6 +9,8 @@
 	let isLoading = false;
 	let params: URLSearchParams;
 	let errorMessage = "";
+	let selectingManually = false;
+	let manualSelector: string;
 
 	onMount(async () => {
 		params = new URLSearchParams(window.location.search);
@@ -42,10 +43,44 @@
 		result = (await response.json()) as BannerFindResponse;
 		isLoading = false;
 	}
+
+	function selectManually() {
+		if (!manualSelector) return;
+		window.location.href =
+			"/analysis?" +
+			buildSearchParams({
+				url: result.url,
+				isMobile: result.isMobile,
+				selector: manualSelector,
+				width: result.width,
+				height: result.height,
+			});
+	}
 </script>
 
 <div class="output">
-	{#if result && result.selector}
+	{#if selectingManually}
+		<h1>Help us find your cookie banner</h1>
+		<span class="subtitle">This will only take a minute</span>
+		<ol>
+			<li><p>Open an incognito window in your browser</p></li>
+			<li><p>Go to {params.get("url")}</p></li>
+			<li><p>Open your browser's developer tools (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>)</p></li>
+			<li><p>Select the topmost element of the cookie banner. It should be highlighted in the developer tools.</p></li>
+			<li><p>Right click on the highlighted element and select "Copy" &rarr; "Copy selector"</p></li>
+			<li><p>Paste the selector below</p></li>
+		</ol>
+		<form>
+			<input
+				class="manual-selector"
+				type="text"
+				bind:value={manualSelector}
+				placeholder="body > div.consent-bump-v2-lightbox > ytm-consent-bump-v2-renderer > div"
+				required
+			/>
+			<button on:click|preventDefault={selectManually}>Submit</button>
+		</form>
+	{:else if result && result.selector}
 		<h1>Cookie banner found</h1>
 		<span class="subtitle">Does this look right?</span>
 		<img src="data:image/png;base64,{result.screenshot}" alt="Screenshot" />
@@ -55,13 +90,13 @@
 			look right".
 		</p>
 		<div class="btns">
-			<a href="#">This does not look right (TODO)</a>
+			<a href="/" on:click|preventDefault={() => (selectingManually = true)}>This does not look right</a>
 			<a
 				class="primary"
 				href="/analysis?{buildSearchParams({
 					url: result.url,
 					isMobile: result.isMobile,
-					selector: result.selector,
+					selector: manualSelector ?? result.selector,
 					width: result.width,
 					height: result.height,
 				})}">Looks correct</a
@@ -79,14 +114,14 @@
 
 		<div class="btns">
 			<a href="/">Start over</a>
-			<a class="primary" href="#">Manual configuration (TODO)</a>
+			<a class="primary" href="/" on:click|preventDefault={() => (selectingManually = true)}>Manual configuration</a>
 		</div>
 	{:else if isLoading}
 		<Loading title="Looking for a cookie banner" subtitle="This will take a few seconds" />
 	{:else if errorMessage.length > 0}
 		<h1>Something went wrong</h1>
 		<p>{errorMessage}</p>
-		<p>Try again button here later :)</p>
+		<p>Try again button goes here eventually :)</p>
 		<!-- <a href="/analysis?url={targetUrl}">Try again</a> -->
 	{/if}
 </div>
@@ -103,6 +138,23 @@
 
 	p {
 		margin-block-start: 1em;
+	}
+
+	ol {
+		margin-block-start: 48px;
+		padding: 0;
+		text-align: left;
+		max-width: 50ch;
+	}
+
+	input.manual-selector {
+		margin-top: 32px;
+		color: black;
+	}
+
+	input.manual-selector + button {
+		margin-top: 16px;
+		color: black;
 	}
 
 	.output {

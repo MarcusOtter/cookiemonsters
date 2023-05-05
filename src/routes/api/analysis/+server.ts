@@ -28,7 +28,7 @@ import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
-import { json } from "@sveltejs/kit";
+import { error, json } from "@sveltejs/kit";
 import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
 import AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
@@ -96,6 +96,9 @@ export const GET = (async (request): Promise<Response> => {
 		const database = new Db();
 		await database.init();
 		const results = await getResults(selector, database, page);
+		if (results.length === 0) {
+			return new Response("Banner not found", { status: 404 });
+		}
 		return new Response(JSON.stringify(results));
 	} catch (e) {
 		// TODO: Do not return the error message to the client for security reasons
@@ -112,9 +115,7 @@ async function getResults(selector: string, database: Db, page: Page): Promise<B
 	// This is hardcoded now, but Oliver had a great idea:
 	// we should probably retry once after a delay of 5-10s if the immediate scan did not find anything.
 	// But we should only to this if the DOM has changed when waiting.
-	console.log(new Date());
 	await new Promise((r) => setTimeout(r, 5000));
-	console.log(new Date());
 
 	const analysisResults = await analyzeBanner(selector, database, page);
 	console.log(JSON.stringify(analysisResults));
@@ -137,9 +138,9 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 
 	const analysisResults: AnalysisResult<any>[] = [];
 
-	const desktopBanner = await page.$(selector);
+	const banner = await page.$(selector);
 
-	if (!desktopBanner) {
+	if (!banner) {
 		return []; // TODO: Implement error handling if banner can't be found.
 	}
 
@@ -160,7 +161,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 
 	const bannerSizeResult = new BannerSizeAnalyser("banner-size", "Banner Size", "", AnalysisCategory.Design);
 	const bannerSizeParams: BannerSizeAnalyserParams = {
-		banner: desktopBanner,
+		banner: banner,
 		page: page,
 	};
 
@@ -276,7 +277,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	const blockingResult = new BlockingAnalyser("blocking", "Blocking", "", AnalysisCategory.Design);
 	const blockingResultParams: BlockingAnalyserParams = {
 		page: page,
-		cookieBanner: desktopBanner,
+		cookieBanner: banner,
 	};
 
 	await blockingResult.analyze(blockingResultParams);
