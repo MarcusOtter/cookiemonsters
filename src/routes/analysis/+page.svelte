@@ -52,9 +52,9 @@
 		return AnalysisStatus.Skipped;
 	}
 
-	function showDetails(i: number) {
-		const detailsBox = document.getElementsByClassName(`extra-details-${i}`)[0] as HTMLElement;
-		const detailsButton = document.getElementsByClassName(`extra-details-button-${i}`)[0] as HTMLElement;
+	function showDetails(i: number, l: number) {
+		const detailsBox = document.getElementsByClassName(`extra-details-${i}-${l}`)[0] as HTMLElement;
+		const detailsButton = document.getElementsByClassName(`extra-details-button-${i}-${l}`)[0] as HTMLElement;
 		if (detailsBox != null && detailsButton != null) {
 			detailsBox.style.display = "block";
 			detailsButton.style.display = "none";
@@ -90,10 +90,10 @@
 			<img src={arrowDown} alt="" width="24" />
 		</a>
 		<div class="details">
-			{#each categories as category}
+			{#each categories as category, i}
 				<h2 id={AnalysisCategory[category]}>{AnalysisCategory[category]}</h2>
 				<div class="category-results {AnalysisStatus[getStatusForCategory(category)].toLowerCase()}">
-					{#each results.filter((res) => res.category === category) as result, i}
+					{#each results.filter((res) => res.category === category) as result, l}
 						<div class="result {AnalysisStatus[result.status].toLowerCase()}">
 							<h3>{result.name}</h3>
 							<p>{result.description === "" ? "Description missing" : result.description}</p>
@@ -101,8 +101,10 @@
 							<p>{result.resultSummary}</p>
 
 							{#if result.details}
-								<button on:click|once={() => showDetails(i)} class="extra-details-button-{i}">Show Details</button>
-								<div class="extra-details-{i}">
+								<button on:click|once={() => showDetails(i, l)} class="extra-details-button-{i}-{l}"
+									>Show Details</button
+								>
+								<div class="extra-details-{i}-{l}">
 									<hr />
 									<h4>Details</h4>
 									<pre>{result.details}</pre>
