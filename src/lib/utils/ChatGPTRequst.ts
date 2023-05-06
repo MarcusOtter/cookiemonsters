@@ -10,6 +10,8 @@ import { Configuration, OpenAIApi } from "openai";
  * @returns {Promise<Object>} The message object from the API response.
  */
 export async function sendChatAPIRequest(system: string, input: string, maxOutputTokens: number) {
+	if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not defined in your .env file");
+
 	const configuration = new Configuration({
 		apiKey: OPENAI_API_KEY,
 	});
