@@ -50,9 +50,9 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
 				if (element) {
 					this.details += `
-Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: 1:${
+Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: ${
 						Math.round((contrast?.contrast as number) * 10) / 10
-					} (${contrast?.contrastLevel})`;
+					}:1 (${contrast?.contrastLevel})`;
 				}
 			}
 		} else if (aaContrastElements.length > 0) {
@@ -64,9 +64,9 @@ Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Co
 				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
 				if (element) {
 					this.details += `
-Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: 1:${
+Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: ${
 						Math.round((contrast?.contrast as number) * 10) / 10
-					} (${contrast?.contrastLevel})`;
+					}:1 (${contrast?.contrastLevel})`;
 				}
 			}
 		} else {
@@ -182,6 +182,8 @@ async function getElementContrasts(
 		if (domElement) {
 			const textColor = await getDeepestChildColor(domElement);
 			const style = await domElement.evaluate((el, textColor) => {
+				const test = (el as HTMLElement).style.color;
+				console.log(`TEST COLOR: ${test}`);
 				const style = getComputedStyle(el);
 				const backgroundColor = style.getPropertyValue("background-color");
 				const fontWeight = +style.getPropertyValue("font-weight");

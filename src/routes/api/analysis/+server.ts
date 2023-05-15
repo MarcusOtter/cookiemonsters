@@ -462,11 +462,6 @@ function mergeResults(results: GPTResult[], inputSizes: number[]): GPTResult {
 		// Merge purpose-described
 		finalResult["purpose-described"] = finalResult["purpose-described"] || result["purpose-described"];
 
-		// Merge language
-		if (result["lang"]) {
-			langCounts[result["lang"]] = (langCounts[result["lang"]] || 0) + 1;
-		}
-
 		// Merge reject-btn and accept-btn based on input size (higher weight for larger inputs)
 		if (
 			result["reject-btn"] !== null &&
@@ -487,7 +482,7 @@ function mergeResults(results: GPTResult[], inputSizes: number[]): GPTResult {
 	}
 
 	// Determine final language
-	finalResult["lang"] = Object.keys(langCounts).reduce((a, b) => (langCounts[a] >= langCounts[b] ? a : b));
+	finalResult["lang"] = results[0]["lang"];
 
 	// Assign the reject-btn and accept-btn from the selected chunks
 	finalResult["reject-btn"] = rejectBtnIndex >= 0 ? results[rejectBtnIndex]["reject-btn"] : null;

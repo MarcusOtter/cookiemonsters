@@ -16,7 +16,7 @@ export async function sendChatAPIRequest(system: string, input: string, maxOutpu
 		apiKey: OPENAI_API_KEY,
 	});
 	const openai = new OpenAIApi(configuration);
-
+	console.log(input);
 	const completion = await openai.createChatCompletion({
 		model: "gpt-3.5-turbo",
 		messages: [
