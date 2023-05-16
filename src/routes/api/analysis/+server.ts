@@ -28,7 +28,6 @@ import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analysers/LanguageAnalyser";
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
-import { error, json } from "@sveltejs/kit";
 import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
 import AnalysisCategory from "$lib/contracts/AnalysisCategory";
 
@@ -111,12 +110,6 @@ export const GET = (async (request): Promise<Response> => {
 
 // TODO: Properly type this file and funcitions
 async function getResults(selector: string, database: Db, page: Page): Promise<BannerAnalysisResponse[]> {
-	// Add delay for debugging purposes
-	// This is hardcoded now, but Oliver had a great idea:
-	// we should probably retry once after a delay of 5-10s if the immediate scan did not find anything.
-	// But we should only to this if the DOM has changed when waiting.
-	await new Promise((r) => setTimeout(r, 5000));
-
 	const analysisResults = await analyzeBanner(selector, database, page);
 	console.log(JSON.stringify(analysisResults));
 
@@ -138,10 +131,15 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 
 	const analysisResults: AnalysisResult<any>[] = [];
 
-	const banner = await page.$(selector);
+	let banner = await page.$(selector);
 
 	if (!banner) {
-		return []; // TODO: Implement error handling if banner can't be found.
+		await new Promise((r) => setTimeout(r, 5000));
+		banner = await page.$(selector);
+
+		if (!banner) {
+			return []; // TODO: Implement error handling if banner can't be found.
+		}
 	}
 
 	const cookies = await page.cookies();
@@ -447,8 +445,6 @@ function mergeResults(results: GPTResult[], inputSizes: number[]): GPTResult {
 		"accept-btn": null,
 		"implied-consent": true,
 	};
-
-	const langCounts: { [key: string]: number } = {};
 
 	let rejectBtnIndex = -1;
 	let acceptBtnIndex = -1;

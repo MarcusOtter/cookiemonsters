@@ -2,7 +2,7 @@ name: 🔎 Banner finder bug
 description: Report issues encountered when finding a cookie banner
 title: 🔎 [TITLE HERE]
 labels:
-  - 'area: finding banners'
+  - "area: finding banners"
   - bug
 body:
   - type: input
@@ -33,6 +33,22 @@ body:
       label: Description
       description: >-
         Explain your problem as clearly as possible. What happened? What did you
-        expect to happen?
+        expect to happen? Screenshots are encouraged!
+      placeholder: |
+        I expected ...
+
+        What happened instead was ...
+
+        Screenshots:
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Can it be consistently reproduced?
+      description: How often does the error happen when you try to reproduce it?
+      options:
+        - it happens every time (100%)
+        - it happens sometimes (1-99%)
+        - can not reproduce it again (0%)
     validations:
       required: true

@@ -27,9 +27,6 @@ export const GET = (async (request): Promise<Response> => {
 	const url = new URL(urlString);
 	const page = isMobile ? await getMobilePage(width, height, url) : await getDesktopPage(width, height, url);
 
-	// We should only do this delay if not found immediately probably :)
-	await new Promise((r) => setTimeout(r, 5000));
-
 	try {
 		const database = new Db();
 		await database.init();
@@ -58,17 +55,16 @@ export const GET = (async (request): Promise<Response> => {
 			return json(new BannerFindResponse(screenshot, selector.text, url.href, isMobile, width, height));
 		}
 
-		// One finder for the demo, either one should work
-		// const finder = new OliverBannerFinder();
 		const finder = new MarcusUltraFinder();
 
-		const newSelector = await finder.findBannerSelector(page);
+		let newSelector = await finder.findBannerSelector(page);
+		if (!newSelector) {
+			await new Promise((r) => setTimeout(r, 5000));
+			newSelector = await finder.findBannerSelector(page);
+		}
+
 		let screenshot = await getScreenshot(newSelector, page);
 		const checksum = getChecksum(screenshot);
-
-		// TODO: we should probably retry once more on HTTPS after a delay of 5-10s if the immediate scan did not find anything.
-		// we know if it didn't find anything if the newSelector is empty
-		// But we should only do this wait if the DOM has changed when waiting.
 
 		if (newSelector) {
 			// TODO: We probably want to add resolution and maybe even the user agent (?)
