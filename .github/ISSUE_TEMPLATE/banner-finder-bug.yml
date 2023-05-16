@@ -1,0 +1,43 @@
+name: Banner finder bug
+description: Report issues encountered when finding a cookie banner
+title: 🔎 [TITLE HERE]
+labels:
+  - 'area: finding banners'
+  - bug
+body:
+  - type: input
+    attributes:
+      label: Website address
+      description: The URL you encountered this problem on
+      placeholder: https://example.com
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Resolution
+      description: The resolution you used for the analysis
+      placeholder: 1920x1080
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Device mode
+      description: The device mode you used for the analysis
+      options:
+        - Desktop
+        - Mobile
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Description
+      description: >-
+        Explain your problem as clearly as possible. What happened? What did you
+        expect to happen?
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: >-
+        This template was generated with [Issue Forms
+        Creator](https://issue-forms-creator.netlify.app)
