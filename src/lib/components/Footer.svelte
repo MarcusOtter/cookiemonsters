@@ -3,7 +3,7 @@
 </script>
 
 <footer>
-	<p>Not legal advice. CrumblyConsent &copy; {date.getFullYear()}</p>
+	<p>Not legal advice. cookiemonsters.eu &copy; {date.getFullYear()}</p>
 	<ul>
 		<li>
 			<a href="/github">GitHub</a>

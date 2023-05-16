@@ -1,5 +1,5 @@
 <header>
-	<a href="/">CrumblyConsent</a>
+	<a href="/">cookiemonsters.eu</a>
 </header>
 
 <style>

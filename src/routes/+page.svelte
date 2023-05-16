@@ -22,7 +22,7 @@
 		<h1>Let's Analyze Your Cookie Banner's GDPR Compliance</h1>
 		<p>The General Data Protection Regulation (GDPR) applies to all websites with users from the EU.</p>
 		<p>
-			CrumblyConsent automatically analyzes your website's cookie banner within minutes and helps you avoid the most
+			cookiemonsters.eu automatically analyzes your website's cookie banner within minutes and helps you avoid the most
 			common pitfalls with GDPR compliance.
 		</p>
 		<p>Learn more on our <a href="/about">about</a> page.</p>

@@ -83,7 +83,7 @@
 			</div>
 		</div>
 		<p class="disclaimer">
-			The results and suggestions provided by CrumblyConsent are not legal advice and can be biased and/or incorrect.
+			The results and suggestions provided by cookiemonsters.eu are not legal advice and can be biased and/or incorrect.
 		</p>
 		<a href="#Functionality" class="details-link">
 			<p>Details</p>
