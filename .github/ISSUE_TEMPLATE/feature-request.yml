@@ -1,0 +1,30 @@
+name: Feature request
+description: Help us improve by suggesting new features or improvements
+title: 💡 [TITLE HERE]
+labels:
+  - feature request
+body:
+  - type: textarea
+    attributes:
+      label: Description
+      description: >-
+        Explain your feature request as clearly as possible. What problem does
+        it solve? How does it improve the tool?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternative solutions
+      description: What alternatives have you considered?
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: >-
+            I have searched for similar issues to make sure this is not a
+            duplicate request
+          required: true
+        - label: >-
+            This request is within the scope of this project (i.e. GDPR and
+            cookie banner related)
+          required: true
