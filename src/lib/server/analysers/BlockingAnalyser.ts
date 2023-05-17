@@ -1,4 +1,4 @@
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { ElementHandle, Page } from "puppeteer";
@@ -22,23 +22,13 @@ export interface BlockingAnalyserParams {
  * @returns {Promise<void>} A promise that resolves when the analysis is completed.
  */
 export class BlockingAnalyser implements AnalysisResult<BlockingAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "blocking";
+	name = "Blocking";
+	description = "Checks whether the cookie banner is blocking the page from being used.";
+	category = AnalysisCategories.Design;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: BlockingAnalyserParams) {
 		const clickableSelectors = ["a", "button", 'input[type="submit"]', 'input[type="button"]', "label"]; // Add more if needed

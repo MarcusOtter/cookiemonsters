@@ -7,11 +7,11 @@
 
 	import arrowDown from "$lib/assets/arrow-down.svg";
 	import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
-	import type Category from "$lib/models/AnalysisCategory";
+	import type AnalysisCategory from "$lib/models/AnalysisCategory";
 	import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 	let results: BannerAnalysisResponse[] = [];
-	let categories: Category[] = [];
+	let categories: AnalysisCategory[] = [];
 
 	let isLoading = false;
 	let errorMessage = "";
@@ -44,12 +44,10 @@
 			JSON.parse(category),
 		);
 
-		console.log(JSON.stringify(categories));
-
 		isLoading = false;
 	}
 
-	function getStatusForCategory(category: Category): AnalysisStatus {
+	function getStatusForCategory(category: AnalysisCategory): AnalysisStatus {
 		const resultsForCategory = results.filter((res) => res.category.name === category.name);
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Failed)) return AnalysisStatus.Failed;
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Warning)) return AnalysisStatus.Warning;
@@ -165,7 +163,7 @@
 	.details {
 		margin-block-start: 128px;
 		text-align: left;
-		max-width: 800px;
+		max-width: 60ch;
 	}
 
 	.details > p {

@@ -1,7 +1,7 @@
 import type { ElementHandle, Page } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 export interface RejectButtonLayerAnalyserParams {
 	rejectButtonElement:
@@ -17,23 +17,13 @@ export interface RejectButtonLayerAnalyserParams {
 }
 
 export class RejectButtonLayerAnalyser implements AnalysisResult<RejectButtonLayerAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "reject-button-layer";
+	name = "Reject Button Layer";
+	description = "Checks whether a button to reject all cookies exists and how difficult it is to get to.";
+	category = AnalysisCategories.Design;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: RejectButtonLayerAnalyserParams) {
 		if (params.rejectButtonElement) {

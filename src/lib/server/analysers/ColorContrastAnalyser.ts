@@ -3,7 +3,7 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import Color from "color";
 import WCAG from "wcag-contrast";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 export interface ColorContrastAnalyserParams {
 	cookieBannerTextElements: {
@@ -18,23 +18,13 @@ export interface ColorContrastAnalyserParams {
 // Note: When evaluating this success criterion, the font size in points should be obtained from the user agent or calculated on font metrics in the way that user agents do. Point sizes are based on the CSS pt size CSS3 Values. The ratio between sizes in points and CSS pixels is 1pt = 1.333px, therefore 14pt and 18pt are equivalent to approximately 18.5px and 24px.
 
 export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "color-contrast";
+	name = "Color Contrast";
+	description = "Checks that the cookie banner follows accessibility standards in color contrast.";
+	category = AnalysisCategories.Design;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: ColorContrastAnalyserParams) {
 		const elementContrasts = await getElementContrasts(params.cookieBannerTextElements);

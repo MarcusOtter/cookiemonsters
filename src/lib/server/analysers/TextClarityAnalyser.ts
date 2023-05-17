@@ -1,4 +1,4 @@
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { GPTResult } from "../GPTResult";
@@ -8,23 +8,13 @@ export interface TextClarityAnalyserParams {
 }
 
 export class TextClarityAnalyser implements AnalysisResult<TextClarityAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "clarity";
+	name = "Text Clarity";
+	description = "Checks whether the text does not contain legal jargon and that it is generally clear.";
+	category = AnalysisCategories.Clarity;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: TextClarityAnalyserParams) {
 		if (params.gptResult["legal-jargon"]) {
