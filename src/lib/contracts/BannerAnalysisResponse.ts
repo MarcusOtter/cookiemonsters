@@ -1,11 +1,11 @@
-import type AnalysisCategory from "./AnalysisCategory";
+import type { Category } from "./AnalysisCategory";
 import type AnalysisStatus from "./AnalysisStatus";
 
 export default class BannerAnalysisResponse {
 	public readonly id: string;
 	public readonly name: string;
 	public readonly description: string;
-	public readonly category: AnalysisCategory;
+	public readonly category: Category;
 	public readonly status: AnalysisStatus;
 	public readonly resultSummary: string;
 	public readonly details: string;
@@ -14,7 +14,7 @@ export default class BannerAnalysisResponse {
 		id: string,
 		name: string,
 		description: string,
-		category: AnalysisCategory,
+		category: Category,
 		status: AnalysisStatus,
 		resultSummary: string,
 		details: string,
