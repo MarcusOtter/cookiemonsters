@@ -2,8 +2,8 @@ import type { Protocol } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { CookieResult } from "$lib/CookieResult";
 import type Db from "../db/Db";
-import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type { Category } from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/models/AnalysisStatus";
+import type AnalysisCategory from "$lib/models/AnalysisCategory";
 
 export interface CookiesBeforeConsentAnalyserParams {
 	cookies: Protocol.Network.Cookie[];
@@ -14,12 +14,12 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 	id: string;
 	name: string;
 	description: string;
-	category: Category;
+	category: AnalysisCategory;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: Category) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

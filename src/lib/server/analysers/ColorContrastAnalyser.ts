@@ -2,8 +2,8 @@ import type { ElementHandle } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import Color from "color";
 import WCAG from "wcag-contrast";
-import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type { Category } from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/models/AnalysisStatus";
+import type AnalysisCategory from "$lib/models/AnalysisCategory";
 
 export interface ColorContrastAnalyserParams {
 	cookieBannerTextElements: {
@@ -21,12 +21,12 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 	id: string;
 	name: string;
 	description: string;
-	category: Category;
+	category: AnalysisCategory;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: Category) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

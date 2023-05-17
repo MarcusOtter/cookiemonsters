@@ -2,10 +2,10 @@
 	import check from "$lib/assets/check.svg";
 	import warn from "$lib/assets/warn.svg";
 	import error from "$lib/assets/error.svg";
+	import AnalysisStatus from "$lib/models/AnalysisStatus";
+	import type AnalysisCategory from "$lib/models/AnalysisCategory";
 
-	import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-	import type { Category } from "$lib/contracts/AnalysisCategory";
-	export let category: Category;
+	export let category: AnalysisCategory;
 	export let status: AnalysisStatus;
 
 	const cssClass = {
@@ -28,7 +28,7 @@
 		<img src={imgSrc} height="32px" alt="" />
 		<span>{AnalysisStatus[status]}</span>
 	</div>
-	<p class="description">{category.displayName}</p>
+	<p class="description">{category.name}</p>
 </div>
 
 <style>

@@ -29,7 +29,7 @@ import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analy
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
 import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
-import { AnalysisCategory } from "$lib/contracts/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 const systemPrompt = `You are a legal assistant and your job is to:
 
@@ -147,7 +147,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"cookies-before-consent",
 		"Cookies Before Consent",
 		"Checks whether cookies are set before consent is obtained from the website's user.",
-		AnalysisCategory.ConsentAndDisclosure,
+		AnalysisCategories.Consent,
 	);
 	const cookiesBeforeConsentParams: CookiesBeforeConsentAnalyserParams = {
 		cookies: cookies,
@@ -161,7 +161,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"banner-size",
 		"Banner Size",
 		"Checks how large percentage of the screen the banner takes up.",
-		AnalysisCategory.DesignAndUserInterface,
+		AnalysisCategories.Design,
 	);
 	const bannerSizeParams: BannerSizeAnalyserParams = {
 		banner: banner,
@@ -177,7 +177,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"color-contrast",
 		"Color Contrast",
 		"Checks that the cookie banner follows accessibility standards in color contrast.",
-		AnalysisCategory.DesignAndUserInterface,
+		AnalysisCategories.Design,
 	);
 	const colorContrastParams: ColorContrastAnalyserParams = {
 		cookieBannerTextElements: cookieBannerTextElements,
@@ -195,7 +195,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"clarity",
 		"Text Clarity",
 		"Checks whether the text does not contain legal jargon and that it is generally clear.",
-		AnalysisCategory.ClarityAndLanguage,
+		AnalysisCategories.Clarity,
 	);
 	const textClarityParams: TextClarityAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -208,7 +208,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"purpose",
 		"Cookie Purpose",
 		"Checks whether cookies' purpose is described clearly.",
-		AnalysisCategory.ClarityAndLanguage,
+		AnalysisCategories.Clarity,
 	);
 	const purposeParams: PurposeAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -221,7 +221,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"implied-consent",
 		"Implied Consent",
 		"Checks that the cookie banner doesn't assume implied consent.",
-		AnalysisCategory.ConsentAndDisclosure,
+		AnalysisCategories.Consent,
 	);
 	const impliedConsentParams: ImpliedConsentAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -234,7 +234,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"language-consistency",
 		"Language Consistency",
 		"Checks whether the cookie banner's language is the same as the page's.",
-		AnalysisCategory.ClarityAndLanguage,
+		AnalysisCategories.Clarity,
 	);
 	const languageParams: LanguageAnalyserParams = {
 		gptResult: gptResultMerged,
@@ -256,7 +256,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"reject-button-layer",
 		"Reject Button Layer",
 		"Checks whether a button to reject all cookies exists and how difficult it is to get to.",
-		AnalysisCategory.DesignAndUserInterface,
+		AnalysisCategories.Design,
 	);
 	const rejectButtonLayerParams: RejectButtonLayerAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
@@ -270,7 +270,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"nudging",
 		"Nudging",
 		"Checks whether the cookie banner nudges the user to accept/decline.",
-		AnalysisCategory.DesignAndUserInterface,
+		AnalysisCategories.Design,
 	);
 	const nudgingParams: NudgingAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
@@ -286,7 +286,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		"blocking",
 		"Blocking",
 		"Checks whether the cookie banner is blocking the page from being used.",
-		AnalysisCategory.DesignAndUserInterface,
+		AnalysisCategories.Design,
 	);
 	const blockingResultParams: BlockingAnalyserParams = {
 		page: page,
@@ -296,7 +296,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await blockingResult.analyze(blockingResultParams);
 	analysisResults.push(blockingResult);
 
-	// TODO: Will fix later... /Marcus
+	// TODO: Will fix later because this is not the correct type... /Marcus
 	return analysisResults;
 }
 

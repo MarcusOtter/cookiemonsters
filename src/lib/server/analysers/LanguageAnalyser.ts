@@ -2,8 +2,8 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { Page } from "puppeteer";
 import type { GPTResult } from "../GPTResult";
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
-import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type { Category } from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/models/AnalysisStatus";
+import type AnalysisCategory from "$lib/models/AnalysisCategory";
 
 export interface LanguageAnalyserParams {
 	gptResult: GPTResult;
@@ -15,12 +15,12 @@ export class LanguageAnalyser implements AnalysisResult<LanguageAnalyserParams> 
 	id: string;
 	name: string;
 	description: string;
-	category: Category;
+	category: AnalysisCategory;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: Category) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
@@ -94,7 +94,7 @@ async function extractRandomText(
 			for (let i = 0; i < count && elements.length > 0; i++) {
 				const randomIndex = Math.floor(Math.random() * elements.length);
 				const randomElement = elements.splice(randomIndex, 1)[0];
-				const text = randomElement.textContent!.trim().substring(0, limit);
+				const text = randomElement.textContent?.trim().substring(0, limit) ?? "";
 				snippets.push(text.replace(/\s+/g, " ").trim());
 			}
 			return snippets;

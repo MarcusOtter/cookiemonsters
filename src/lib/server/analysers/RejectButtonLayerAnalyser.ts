@@ -1,7 +1,7 @@
 import type { ElementHandle, Page } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
-import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type { Category } from "$lib/contracts/AnalysisCategory";
+import AnalysisStatus from "$lib/models/AnalysisStatus";
+import type AnalysisCategory from "$lib/models/AnalysisCategory";
 
 export interface RejectButtonLayerAnalyserParams {
 	rejectButtonElement:
@@ -20,12 +20,12 @@ export class RejectButtonLayerAnalyser implements AnalysisResult<RejectButtonLay
 	id: string;
 	name: string;
 	description: string;
-	category: Category;
+	category: AnalysisCategory;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: Category) {
+	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
