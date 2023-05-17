@@ -3,11 +3,12 @@
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 	import Loading from "$lib/components/Loading.svelte";
 	import CategoryCircle from "$lib/components/CategoryCircle.svelte";
-	import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+	import AnalysisStatus from "$lib/models/AnalysisStatus";
 
 	import arrowDown from "$lib/assets/arrow-down.svg";
 	import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
-	import { AnalysisCategory, type Category } from "$lib/contracts/AnalysisCategory";
+	import type Category from "$lib/models/AnalysisCategory";
+	import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 	let results: BannerAnalysisResponse[] = [];
 	let categories: Category[] = [];
@@ -49,7 +50,7 @@
 	}
 
 	function getStatusForCategory(category: Category): AnalysisStatus {
-		const resultsForCategory = results.filter((res) => res.category.displayName === category.displayName);
+		const resultsForCategory = results.filter((res) => res.category.name === category.name);
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Failed)) return AnalysisStatus.Failed;
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Warning)) return AnalysisStatus.Warning;
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Passed)) return AnalysisStatus.Passed;
@@ -72,16 +73,13 @@
 			<h1>Overview</h1>
 			<div class="circles">
 				<CategoryCircle
-					category={AnalysisCategory.ConsentAndDisclosure}
-					status={getStatusForCategory(AnalysisCategory.ConsentAndDisclosure)}
+					category={AnalysisCategories.Consent}
+					status={getStatusForCategory(AnalysisCategories.Consent)}
 				/>
+				<CategoryCircle category={AnalysisCategories.Design} status={getStatusForCategory(AnalysisCategories.Design)} />
 				<CategoryCircle
-					category={AnalysisCategory.DesignAndUserInterface}
-					status={getStatusForCategory(AnalysisCategory.DesignAndUserInterface)}
-				/>
-				<CategoryCircle
-					category={AnalysisCategory.ClarityAndLanguage}
-					status={getStatusForCategory(AnalysisCategory.ClarityAndLanguage)}
+					category={AnalysisCategories.Clarity}
+					status={getStatusForCategory(AnalysisCategories.Clarity)}
 				/>
 			</div>
 		</div>
@@ -94,10 +92,10 @@
 		</a>
 		<div class="details">
 			{#each categories as category, i}
-				<h2 id={category.name}>{category.displayName}</h2>
+				<h2 id={category.name}>{category.name}</h2>
 				<p>{category.description}</p>
 				<div class="category-results {AnalysisStatus[getStatusForCategory(category)].toLowerCase()}">
-					{#each results.filter((res) => res.category.displayName === category.displayName) as result, l}
+					{#each results.filter((res) => res.category.name === category.name) as result, l}
 						<div class="result {AnalysisStatus[result.status].toLowerCase()}">
 							<h3>{result.name}</h3>
 							<p>{result.description === "" ? "Description missing" : result.description}</p>
@@ -249,18 +247,6 @@
 		content: "Skip";
 		background-color: hsla(0, 0%, 100%, 0.1);
 		color: white;
-	}
-
-	.category-results .result.passed {
-		/* border-color: hsl(131, 85%, 72%); */
-	}
-
-	.category-results .result.warning {
-		/* border-color: hsl(49, 85%, 72%); */
-	}
-
-	.category-results .result.failed {
-		/* border-color: hsl(0, 85%, 72%); */
 	}
 
 	.circles {
