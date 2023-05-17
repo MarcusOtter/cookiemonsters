@@ -1,4 +1,4 @@
-import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import type { Category } from "$lib/contracts/AnalysisCategory";
 import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { GPTResult } from "../GPTResult";
@@ -11,12 +11,12 @@ export class TextClarityAnalyser implements AnalysisResult<TextClarityAnalyserPa
 	id: string;
 	name: string;
 	description: string;
-	category: AnalysisCategory;
+	category: Category;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
+	constructor(id: string, name: string, description: string, category: Category) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

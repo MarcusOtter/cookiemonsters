@@ -2,10 +2,10 @@
 	import check from "$lib/assets/check.svg";
 	import warn from "$lib/assets/warn.svg";
 	import error from "$lib/assets/error.svg";
-	import AnalysisCategory from "$lib/contracts/AnalysisCategory";
-	import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 
-	export let category: AnalysisCategory;
+	import AnalysisStatus from "$lib/contracts/AnalysisStatus";
+	import type { Category } from "$lib/contracts/AnalysisCategory";
+	export let category: Category;
 	export let status: AnalysisStatus;
 
 	const cssClass = {
@@ -28,7 +28,7 @@
 		<img src={imgSrc} height="32px" alt="" />
 		<span>{AnalysisStatus[status]}</span>
 	</div>
-	<p>{AnalysisCategory[category]}</p>
+	<p class="description">{category.displayName}</p>
 </div>
 
 <style>
@@ -65,5 +65,9 @@
 
 	.circle.failed {
 		border-color: hsl(0, 85%, 72%);
+	}
+
+	.description {
+		max-width: 150px;
 	}
 </style>

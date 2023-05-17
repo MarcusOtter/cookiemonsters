@@ -3,7 +3,7 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { CookieResult } from "$lib/CookieResult";
 import type Db from "../db/Db";
 import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import type { Category } from "$lib/contracts/AnalysisCategory";
 
 export interface CookiesBeforeConsentAnalyserParams {
 	cookies: Protocol.Network.Cookie[];
@@ -14,12 +14,12 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 	id: string;
 	name: string;
 	description: string;
-	category: AnalysisCategory;
+	category: Category;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
+	constructor(id: string, name: string, description: string, category: Category) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

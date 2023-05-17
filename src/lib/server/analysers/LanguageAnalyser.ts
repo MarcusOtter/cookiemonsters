@@ -3,7 +3,7 @@ import type { Page } from "puppeteer";
 import type { GPTResult } from "../GPTResult";
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import type { Category } from "$lib/contracts/AnalysisCategory";
 
 export interface LanguageAnalyserParams {
 	gptResult: GPTResult;
@@ -15,12 +15,12 @@ export class LanguageAnalyser implements AnalysisResult<LanguageAnalyserParams> 
 	id: string;
 	name: string;
 	description: string;
-	category: AnalysisCategory;
+	category: Category;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
+	constructor(id: string, name: string, description: string, category: Category) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

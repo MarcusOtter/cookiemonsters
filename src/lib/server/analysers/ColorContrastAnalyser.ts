@@ -3,7 +3,7 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import Color from "color";
 import WCAG from "wcag-contrast";
 import AnalysisStatus from "$lib/contracts/AnalysisStatus";
-import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import type { Category } from "$lib/contracts/AnalysisCategory";
 
 export interface ColorContrastAnalyserParams {
 	cookieBannerTextElements: {
@@ -21,12 +21,12 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 	id: string;
 	name: string;
 	description: string;
-	category: AnalysisCategory;
+	category: Category;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
 
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
+	constructor(id: string, name: string, description: string, category: Category) {
 		this.id = id;
 		this.name = name;
 		this.description = description;

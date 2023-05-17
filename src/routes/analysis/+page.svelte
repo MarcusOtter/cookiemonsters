@@ -3,14 +3,14 @@
 	import getErrorMessage from "$lib/utils/getErrorMessage";
 	import Loading from "$lib/components/Loading.svelte";
 	import CategoryCircle from "$lib/components/CategoryCircle.svelte";
-	import AnalysisCategory from "$lib/contracts/AnalysisCategory";
 	import AnalysisStatus from "$lib/contracts/AnalysisStatus";
 
 	import arrowDown from "$lib/assets/arrow-down.svg";
 	import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
+	import { AnalysisCategory, type Category } from "$lib/contracts/AnalysisCategory";
 
 	let results: BannerAnalysisResponse[] = [];
-	let categories: AnalysisCategory[] = [];
+	let categories: Category[] = [];
 
 	let isLoading = false;
 	let errorMessage = "";
@@ -39,13 +39,17 @@
 		}
 
 		results = (await response.json()) as BannerAnalysisResponse[];
-		categories = [...new Set(results.map((res) => res.category))];
+		categories = Array.from(new Set(results.map((res) => JSON.stringify(res.category)))).map((category) =>
+			JSON.parse(category),
+		);
+
+		console.log(JSON.stringify(categories));
 
 		isLoading = false;
 	}
 
-	function getStatusForCategory(category: AnalysisCategory): AnalysisStatus {
-		const resultsForCategory = results.filter((res) => res.category === category);
+	function getStatusForCategory(category: Category): AnalysisStatus {
+		const resultsForCategory = results.filter((res) => res.category.displayName === category.displayName);
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Failed)) return AnalysisStatus.Failed;
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Warning)) return AnalysisStatus.Warning;
 		if (resultsForCategory.some((res) => res.status === AnalysisStatus.Passed)) return AnalysisStatus.Passed;
@@ -68,32 +72,32 @@
 			<h1>Overview</h1>
 			<div class="circles">
 				<CategoryCircle
-					category={AnalysisCategory.Functionality}
-					status={getStatusForCategory(AnalysisCategory.Functionality)}
-				/>
-				<CategoryCircle category={AnalysisCategory.Design} status={getStatusForCategory(AnalysisCategory.Design)} />
-				<CategoryCircle
-					category={AnalysisCategory.Information}
-					status={getStatusForCategory(AnalysisCategory.Information)}
+					category={AnalysisCategory.ConsentAndDisclosure}
+					status={getStatusForCategory(AnalysisCategory.ConsentAndDisclosure)}
 				/>
 				<CategoryCircle
-					category={AnalysisCategory.Accessibility}
-					status={getStatusForCategory(AnalysisCategory.Accessibility)}
+					category={AnalysisCategory.DesignAndUserInterface}
+					status={getStatusForCategory(AnalysisCategory.DesignAndUserInterface)}
+				/>
+				<CategoryCircle
+					category={AnalysisCategory.ClarityAndLanguage}
+					status={getStatusForCategory(AnalysisCategory.ClarityAndLanguage)}
 				/>
 			</div>
 		</div>
 		<p class="disclaimer">
 			The results and suggestions provided by cookiemonsters.eu are not legal advice and can be biased and/or incorrect.
 		</p>
-		<a href="#Functionality" class="details-link">
+		<a href="#ConsentAndDisclosure" class="details-link">
 			<p>Details</p>
 			<img src={arrowDown} alt="" width="24" />
 		</a>
 		<div class="details">
 			{#each categories as category, i}
-				<h2 id={AnalysisCategory[category]}>{AnalysisCategory[category]}</h2>
+				<h2 id={category.name}>{category.displayName}</h2>
+				<p>{category.description}</p>
 				<div class="category-results {AnalysisStatus[getStatusForCategory(category)].toLowerCase()}">
-					{#each results.filter((res) => res.category === category) as result, l}
+					{#each results.filter((res) => res.category.displayName === category.displayName) as result, l}
 						<div class="result {AnalysisStatus[result.status].toLowerCase()}">
 							<h3>{result.name}</h3>
 							<p>{result.description === "" ? "Description missing" : result.description}</p>
@@ -163,6 +167,13 @@
 	.details {
 		margin-block-start: 128px;
 		text-align: left;
+		max-width: 800px;
+	}
+
+	.details > p {
+		font-size: 0.85em;
+		line-height: 1.5em;
+		margin-block-start: 10px;
 	}
 
 	.details h2 {

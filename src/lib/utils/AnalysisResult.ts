@@ -1,11 +1,11 @@
-import type AnalysisCategory from "$lib/contracts/AnalysisCategory";
+import type { Category } from "$lib/contracts/AnalysisCategory";
 import type AnalysisStatus from "$lib/contracts/AnalysisStatus";
 
 export default interface AnalysisResult<T> {
 	id: string;
 	name: string;
 	description: string;
-	category: AnalysisCategory;
+	category: Category;
 	status: AnalysisStatus;
 	resultSummary: string;
 	details: string;
