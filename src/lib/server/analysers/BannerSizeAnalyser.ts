@@ -2,7 +2,7 @@ import type { ElementHandle, Page } from "puppeteer";
 import { getViewportSizeIndividually } from "../puppeteerHelpers";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 export interface BannerSizeAnalyserParams {
 	banner: ElementHandle<Element>;
@@ -10,23 +10,13 @@ export interface BannerSizeAnalyserParams {
 }
 
 export class BannerSizeAnalyser implements AnalysisResult<BannerSizeAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "banner-size";
+	name = "Banner Size";
+	description = "Checks how large percentage of the screen the banner takes up.";
+	category = AnalysisCategories.Design;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: BannerSizeAnalyserParams) {
 		const bannerSizePercentage = params.banner ? await getBannerAreaPercentage(params.banner, params.page) : 0;

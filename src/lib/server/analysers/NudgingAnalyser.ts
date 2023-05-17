@@ -1,3 +1,4 @@
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 import type AnalysisCategory from "$lib/models/AnalysisCategory";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
@@ -27,23 +28,13 @@ export interface NudgingAnalyserParams {
 }
 
 export class NudgingAnalyser implements AnalysisResult<NudgingAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "nudging";
+	name = "Nudging";
+	description = "Checks whether the cookie banner nudges the user to accept/decline.";
+	category = AnalysisCategories.Design;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: NudgingAnalyserParams) {
 		this.resultSummary = `This check was skipped due to the accept/decline button missing or being on different layers.`;

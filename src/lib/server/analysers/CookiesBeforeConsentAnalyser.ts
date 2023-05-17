@@ -3,7 +3,7 @@ import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { CookieResult } from "$lib/CookieResult";
 import type Db from "../db/Db";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 export interface CookiesBeforeConsentAnalyserParams {
 	cookies: Protocol.Network.Cookie[];
@@ -11,23 +11,13 @@ export interface CookiesBeforeConsentAnalyserParams {
 }
 
 export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBeforeConsentAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "cookies-before-consent";
+	name = "Cookies Before Consent";
+	description = "Checks whether cookies are set before consent is obtained from the website's user.";
+	category = AnalysisCategories.Consent;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: CookiesBeforeConsentAnalyserParams) {
 		const foundCookies: CookieResult[] = [];

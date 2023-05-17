@@ -3,7 +3,7 @@ import type { Page } from "puppeteer";
 import type { GPTResult } from "../GPTResult";
 import { sendChatAPIRequest } from "$lib/utils/ChatGPTRequst";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
+import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 export interface LanguageAnalyserParams {
 	gptResult: GPTResult;
@@ -12,23 +12,13 @@ export interface LanguageAnalyserParams {
 }
 
 export class LanguageAnalyser implements AnalysisResult<LanguageAnalyserParams> {
-	id: string;
-	name: string;
-	description: string;
-	category: AnalysisCategory;
-	status: AnalysisStatus;
-	resultSummary: string;
-	details: string;
-
-	constructor(id: string, name: string, description: string, category: AnalysisCategory) {
-		this.id = id;
-		this.name = name;
-		this.description = description;
-		this.category = category;
-		this.status = AnalysisStatus.Skipped;
-		this.resultSummary = "";
-		this.details = "";
-	}
+	id = "language-consistency";
+	name = "Language Consistency";
+	description = "Checks whether the cookie banner's language is the same as the page's.";
+	category = AnalysisCategories.Clarity;
+	status = AnalysisStatus.Skipped;
+	resultSummary = "";
+	details = "";
 
 	async analyze(params: LanguageAnalyserParams) {
 		if (await checkLanguageDifference(params.gptResult["lang"], params.bannerSelector, params.page)) {

@@ -143,45 +143,22 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	}
 
 	const cookies = await page.cookies();
-	const cookiesBeforeConsentResult = new CookiesBeforeConsentAnalyser(
-		"cookies-before-consent",
-		"Cookies Before Consent",
-		"Checks whether cookies are set before consent is obtained from the website's user.",
-		AnalysisCategories.Consent,
-	);
-	const cookiesBeforeConsentParams: CookiesBeforeConsentAnalyserParams = {
-		cookies: cookies,
-		database: database,
-	};
+	const cookiesBeforeConsentResult = new CookiesBeforeConsentAnalyser();
+	const cookiesBeforeConsentParams: CookiesBeforeConsentAnalyserParams = { cookies: cookies, database: database };
 
 	await cookiesBeforeConsentResult.analyze(cookiesBeforeConsentParams);
 	analysisResults.push(cookiesBeforeConsentResult);
 
-	const bannerSizeResult = new BannerSizeAnalyser(
-		"banner-size",
-		"Banner Size",
-		"Checks how large percentage of the screen the banner takes up.",
-		AnalysisCategories.Design,
-	);
-	const bannerSizeParams: BannerSizeAnalyserParams = {
-		banner: banner,
-		page: page,
-	};
+	const bannerSizeAnalyser = new BannerSizeAnalyser();
+	const bannerSizeParams: BannerSizeAnalyserParams = { banner: banner, page: page };
 
-	await bannerSizeResult.analyze(bannerSizeParams);
-	analysisResults.push(bannerSizeResult);
+	await bannerSizeAnalyser.analyze(bannerSizeParams);
+	analysisResults.push(bannerSizeAnalyser);
 
 	const cookieBannerTextElements = await getCookieBannerTextElements(selector, page);
 
-	const colorContrastResult = new ColorContrastAnalyser(
-		"color-contrast",
-		"Color Contrast",
-		"Checks that the cookie banner follows accessibility standards in color contrast.",
-		AnalysisCategories.Design,
-	);
-	const colorContrastParams: ColorContrastAnalyserParams = {
-		cookieBannerTextElements: cookieBannerTextElements,
-	};
+	const colorContrastResult = new ColorContrastAnalyser();
+	const colorContrastParams: ColorContrastAnalyserParams = { cookieBannerTextElements };
 
 	await colorContrastResult.analyze(colorContrastParams);
 	analysisResults.push(colorContrastResult);
@@ -191,51 +168,25 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	const gptResultMerged = mergeResults(results, chunkSizes);
 	console.log(`Final result: ${JSON.stringify(gptResultMerged)}`);
 
-	const textClarityResult = new TextClarityAnalyser(
-		"clarity",
-		"Text Clarity",
-		"Checks whether the text does not contain legal jargon and that it is generally clear.",
-		AnalysisCategories.Clarity,
-	);
-	const textClarityParams: TextClarityAnalyserParams = {
-		gptResult: gptResultMerged,
-	};
+	const textClarityResult = new TextClarityAnalyser();
+	const textClarityParams: TextClarityAnalyserParams = { gptResult: gptResultMerged };
 
 	await textClarityResult.analyze(textClarityParams);
 	analysisResults.push(textClarityResult);
 
-	const purposeResult = new PurposeAnalyser(
-		"purpose",
-		"Cookie Purpose",
-		"Checks whether cookies' purpose is described clearly.",
-		AnalysisCategories.Clarity,
-	);
-	const purposeParams: PurposeAnalyserParams = {
-		gptResult: gptResultMerged,
-	};
+	const purposeResult = new PurposeAnalyser();
+	const purposeParams: PurposeAnalyserParams = { gptResult: gptResultMerged };
 
 	await purposeResult.analyze(purposeParams);
 	analysisResults.push(purposeResult);
 
-	const impliedConsentResult = new ImpliedConsentAnalyser(
-		"implied-consent",
-		"Implied Consent",
-		"Checks that the cookie banner doesn't assume implied consent.",
-		AnalysisCategories.Consent,
-	);
-	const impliedConsentParams: ImpliedConsentAnalyserParams = {
-		gptResult: gptResultMerged,
-	};
+	const impliedConsentResult = new ImpliedConsentAnalyser();
+	const impliedConsentParams: ImpliedConsentAnalyserParams = { gptResult: gptResultMerged };
 
 	await impliedConsentResult.analyze(impliedConsentParams);
 	analysisResults.push(impliedConsentResult);
 
-	const languageResult = new LanguageAnalyser(
-		"language-consistency",
-		"Language Consistency",
-		"Checks whether the cookie banner's language is the same as the page's.",
-		AnalysisCategories.Clarity,
-	);
+	const languageResult = new LanguageAnalyser();
 	const languageParams: LanguageAnalyserParams = {
 		gptResult: gptResultMerged,
 		bannerSelector: selector,
@@ -252,12 +203,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 		(element) => element.index == gptResultMerged["reject-btn"],
 	);
 
-	const rejectButtonLayerResult = new RejectButtonLayerAnalyser(
-		"reject-button-layer",
-		"Reject Button Layer",
-		"Checks whether a button to reject all cookies exists and how difficult it is to get to.",
-		AnalysisCategories.Design,
-	);
+	const rejectButtonLayerResult = new RejectButtonLayerAnalyser();
 	const rejectButtonLayerParams: RejectButtonLayerAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
 		page: page,
@@ -266,12 +212,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await rejectButtonLayerResult.analyze(rejectButtonLayerParams);
 	analysisResults.push(rejectButtonLayerResult);
 
-	const nudgingResult = new NudgingAnalyser(
-		"nudging",
-		"Nudging",
-		"Checks whether the cookie banner nudges the user to accept/decline.",
-		AnalysisCategories.Design,
-	);
+	const nudgingResult = new NudgingAnalyser();
 	const nudgingParams: NudgingAnalyserParams = {
 		rejectButtonElement: rejectButtonElement,
 		acceptButtonElement: acceptButtonElement,
@@ -282,12 +223,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	await nudgingResult.analyze(nudgingParams);
 	analysisResults.push(nudgingResult);
 
-	const blockingResult = new BlockingAnalyser(
-		"blocking",
-		"Blocking",
-		"Checks whether the cookie banner is blocking the page from being used.",
-		AnalysisCategories.Design,
-	);
+	const blockingResult = new BlockingAnalyser();
 	const blockingResultParams: BlockingAnalyserParams = {
 		page: page,
 		cookieBanner: banner,
