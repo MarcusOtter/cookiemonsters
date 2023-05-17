@@ -31,7 +31,15 @@
 	<form on:submit|preventDefault={goToBanner} method="post">
 		<label for="url">Web address (URL)</label>
 		<div class="inputs">
-			<input id="url" name="url" bind:value={url} placeholder="https://example.com" required size="22" />
+			<input
+				id="url"
+				name="url"
+				bind:value={url}
+				placeholder="https://example.com"
+				required
+				size="22"
+				autocomplete="off"
+			/>
 			<ResolutionPicker />
 
 			<button>Analyze</button>
