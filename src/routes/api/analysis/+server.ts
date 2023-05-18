@@ -157,7 +157,7 @@ async function analyzeBanner(selector: string, database: Db, page: Page): Promis
 	const cookieBannerTextElements = await getCookieBannerTextElements(selector, page);
 
 	const colorContrastResult = new ColorContrastAnalyser();
-	const colorContrastParams: ColorContrastAnalyserParams = { cookieBannerTextElements };
+	const colorContrastParams: ColorContrastAnalyserParams = { page: page, bannerSelector: selector };
 
 	await colorContrastResult.analyze(colorContrastParams);
 	analysisResults.push(colorContrastResult);

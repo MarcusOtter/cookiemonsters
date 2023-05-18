@@ -1,18 +1,12 @@
-import type { ElementHandle } from "puppeteer";
+import type { Page } from "puppeteer";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
-import Color from "color";
-import WCAG from "wcag-contrast";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
 import AnalysisCategories from "$lib/models/AnalysisCategories";
+import { AxePuppeteer } from "axe-puppeteer";
 
 export interface ColorContrastAnalyserParams {
-	cookieBannerTextElements: {
-		index: number;
-		tag: string;
-		text: string;
-		element: ElementHandle<Element>;
-		selector: string;
-	}[];
+	page: Page;
+	bannerSelector: string;
 }
 
 // Note: When evaluating this success criterion, the font size in points should be obtained from the user agent or calculated on font metrics in the way that user agents do. Point sizes are based on the CSS pt size CSS3 Values. The ratio between sizes in points and CSS pixels is 1pt = 1.333px, therefore 14pt and 18pt are equivalent to approximately 18.5px and 24px.
@@ -27,239 +21,150 @@ export class ColorContrastAnalyser implements AnalysisResult<ColorContrastAnalys
 	details = "";
 
 	async analyze(params: ColorContrastAnalyserParams) {
-		const elementContrasts = await getElementContrasts(params.cookieBannerTextElements);
-		const failedContrastElements = elementContrasts.filter((el) => el.contrastLevel == "FAIL");
-		const aaContrastElements = elementContrasts.filter((el) => el.contrastLevel == "AA");
+		const colorContrastCategories = await checkColorContrast(params.page, params.bannerSelector);
+		const categoryFAIL = colorContrastCategories[0];
+		const categoryAA = colorContrastCategories[1];
+		const categoryAAA = colorContrastCategories[2];
 
-		if (failedContrastElements.length > 0) {
-			this.resultSummary = `${failedContrastElements.length} of the cookie banner's text's contrast is insufficient (WCAG's AA minimum contrast).`;
-			this.status = AnalysisStatus.Failed;
-			this.details = `Elements with contrast below AA:`;
-
-			for (const contrast of failedContrastElements) {
-				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
-				if (element) {
-					this.details += `
-Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: ${
-						Math.round((contrast?.contrast as number) * 10) / 10
-					}:1 (${contrast?.contrastLevel})`;
-				}
-			}
-		} else if (aaContrastElements.length > 0) {
-			this.resultSummary = `${aaContrastElements.length} of the cookie banner's text's contrast has a contrast rating of AA (WCAG's minimum contrast), but should be AAA.`;
-			this.status = AnalysisStatus.Warning;
-			this.details = `Elements with contrast below AAA:`;
-
-			for (const contrast of aaContrastElements) {
-				const element = params.cookieBannerTextElements.find((el) => el.index == contrast.index);
-				if (element) {
-					this.details += `
-Element: <${element.tag}>${truncateString(element.text, 50)}</${element.tag}> Contrast: ${
-						Math.round((contrast?.contrast as number) * 10) / 10
-					}:1 (${contrast?.contrastLevel})`;
-				}
-			}
-		} else {
-			this.resultSummary = "Cookie banner contains no elements with insufficient contrast.";
+		if (categoryAAA.length > 0) {
+			this.resultSummary = `All of the cookie banner's text's contrast is sufficient (AAA).`;
 			this.status = AnalysisStatus.Passed;
+			this.details = `Elements with AAA:
+`;
+
+			for (const element of categoryAAA) {
+				this.details += `
+Element: ${element.nodeHtml}
+Contrast: ${element.contrast}:1 (${element.contrastLevel})
+`;
+			}
+		}
+
+		if (categoryAA.length > 0) {
+			this.resultSummary = `${categoryAA.length} of the cookie banner's text's contrast is within the minimum requirement (AA), however AAA is preferred.`;
+			this.status = AnalysisStatus.Warning;
+			this.details += `
+			Elements with AA:
+`;
+
+			for (const element of categoryAA) {
+				this.details += `
+Element: ${element.nodeHtml}
+Contrast: ${element.contrast}:1 (${element.contrastLevel})
+`;
+			}
+		}
+
+		if (categoryFAIL.length > 0) {
+			this.resultSummary = `${categoryFAIL.length} of the cookie banner's text's contrast is insufficient (below AA).`;
+			this.status = AnalysisStatus.Failed;
+			this.details += `
+Elements with below AA:
+`;
+
+			for (const element of categoryFAIL) {
+				this.details += `
+Element: ${element.nodeHtml}
+Contrast: ${element.contrast}:1 (${element.contrastLevel})
+`;
+			}
 		}
 	}
 }
 
-function truncateString(str: string, maxLength: number): string {
-	if (str.length <= maxLength) {
-		return str;
-	}
-	return str.slice(0, maxLength - 3) + "...";
-}
-
-// There seem to be edge cases with this, such as uu.se.
-const getDeepestChildColor = async (element: ElementHandle) => {
-	return await element.evaluate((el) => {
-		const findDeepestChildColor = (node: Element): string | null => {
-			let result = null;
-
-			for (const child of Array.from(node.children)) {
-				const childStyle = getComputedStyle(child);
-				const childColor = childStyle.getPropertyValue("color");
-
-				if (childColor !== getComputedStyle(node).getPropertyValue("color")) {
-					result = childColor;
-				}
-
-				const childResult = findDeepestChildColor(child);
-
-				if (childResult) {
-					result = childResult;
-				}
-			}
-			return result;
-		};
-
-		return findDeepestChildColor(el) || getComputedStyle(el).getPropertyValue("color");
-	});
+type ElementContrast = {
+	nodeHtml: string;
+	selector: string;
+	fgColor: string;
+	bgColor: string;
+	contrast: number;
+	fontSize: number;
+	fontWeight: string;
+	contrastLevel: string;
+	isLargeText: boolean | null;
 };
 
-async function findAncestorWithBackgroundColor(element: ElementHandle): Promise<ElementHandle | null> {
-	let currentElement = element;
+async function checkColorContrast(
+	page: Page,
+	selector: string,
+): Promise<[ElementContrast[], ElementContrast[], ElementContrast[]]> {
+	await page.waitForSelector(selector);
 
-	while ((await currentElement.evaluate((el) => el.tagName)) !== "HTML") {
-		currentElement = (await currentElement.$$("xpath/.."))[0];
-		if (await hasBackground(currentElement)) {
-			return currentElement;
+	const contrastFAILElements: ElementContrast[] = [];
+	const contrastAAElements: ElementContrast[] = [];
+	const contrastAAAElements: ElementContrast[] = [];
+
+	const results = await new AxePuppeteer(page).withRules("color-contrast").include([selector]).analyze();
+	console.log(JSON.stringify(results));
+
+	const colorContrastElements = [];
+	colorContrastElements.push(...results.violations);
+	colorContrastElements.push(...results.passes);
+	for (const element of colorContrastElements) {
+		for (const node of element.nodes) {
+			const elementContrast: ElementContrast = {
+				nodeHtml: node.html,
+				selector: node.target[0],
+				fgColor: node.any[0].data.fgColor,
+				bgColor: node.any[0].data.bgColor,
+				contrast: node.any[0].data.contrastRatio as number,
+				fontSize: node.any[0].data.fontSize.split("pt")[0] as number,
+				fontWeight: node.any[0].data.fontWeight,
+				contrastLevel: "FAIL",
+				isLargeText: null,
+			};
+
+			const isLargeText =
+				(elementContrast.fontSize >= 14 &&
+					(elementContrast.fontWeight == "bold" || elementContrast.fontWeight == "bolder")) ||
+				elementContrast.fontSize >= 18;
+
+			if (isLargeText) {
+				if (elementContrast.contrast >= 4.5) {
+					elementContrast.contrastLevel = "AAA";
+					contrastAAAElements.push(elementContrast);
+				} else if (elementContrast.contrast >= 3) {
+					elementContrast.contrastLevel = "AA";
+					contrastAAElements.push(elementContrast);
+				}
+			} else {
+				if (elementContrast.contrast >= 7) {
+					elementContrast.contrastLevel = "AAA";
+					contrastAAAElements.push(elementContrast);
+				} else if (elementContrast.contrast >= 4.5) {
+					elementContrast.contrastLevel = "AA";
+					contrastAAElements.push(elementContrast);
+				}
+			}
+
+			if (elementContrast.contrastLevel == "FAIL") {
+				contrastFAILElements.push(elementContrast);
+			}
 		}
 	}
 
-	return null;
+	return [contrastFAILElements, contrastAAElements, contrastAAAElements];
+
+	// From the violations, we need to check each elements' HTML and check with regex whether it is a text object. If not, it's contrast doesn't matter really.
+	// Then we need to check the font-size and weight to determine if text is large. Then we can give appropriate AA or AAA rating based on that and contrast ratio. Ez
 }
 
-async function hasBackground(element: ElementHandle): Promise<boolean> {
-	const style = await element.evaluate((el) => {
-		const style = getComputedStyle(el);
-		const backgroundColor = style.getPropertyValue("background-color");
-		const background = style.getPropertyValue("background");
-		const display = style.getPropertyValue("display");
-		return { backgroundColor, background, display };
-	});
+// We'll see if we need this function. I'm not quite sure if axe-core gives contrast for elements that are not text. If it does, we need this I think. We'll keep an eye on it.
+/*function containsText(elementString: string): boolean {
+	const dom = new JSDOM(`<!DOCTYPE html><body>${elementString}</body>`);
+	const element = dom.window.document.body.firstChild;
 
-	if (style.display == "none") {
+	if (!element) {
 		return false;
 	}
 
-	const hasBackgroundColor = !style.backgroundColor.includes("rgba(0, 0, 0, 0)");
-	const hasBackground = !style.background.includes("rgba(0, 0, 0, 0)");
-
-	if (hasBackgroundColor || hasBackground) {
-		return true;
+	// Check if it's an HTMLElement (which excludes self-closing elements like img or input)
+	if (!(element instanceof dom.window.HTMLElement)) {
+		return false;
 	}
 
-	return false;
+	// Check if it contains text
+	const textContent = element.textContent || "";
+	return textContent.trim() !== "";
 }
-
-function convertToHex(colorString: string): string {
-	const color = Color(colorString);
-	const rgba = color.rgb().array();
-	const hex = color.hex();
-	const hasAlpha = colorString.toLowerCase().includes("rgba");
-	if (hasAlpha) {
-		const alpha = hasAlpha && rgba[3] !== undefined ? (rgba[3] * 255).toString(16) : "";
-		return hex + alpha.padStart(2, "0");
-	}
-	return hex;
-}
-
-async function getElementContrasts(
-	cookieBannerTextElements: {
-		index: number;
-		tag: string;
-		text: string;
-		element: ElementHandle<Element>;
-		selector: string;
-	}[],
-): Promise<
-	{
-		index: number;
-		contrastLevel: string;
-		contrast: number;
-		isLargeText: boolean;
-	}[]
-> {
-	const elementContrasts: { index: number; contrastLevel: string; contrast: number; isLargeText: boolean }[] = [];
-
-	for (const element of cookieBannerTextElements) {
-		const domElement = element.element; // TODO: potentially implement selectors here for future proofing.
-		console.log(`Checking element: ${element.index}, ${truncateString(element.text, 50)}`);
-		if (domElement) {
-			const textColor = await getDeepestChildColor(domElement);
-			const style = await domElement.evaluate((el, textColor) => {
-				const test = (el as HTMLElement).style.color;
-				console.log(`TEST COLOR: ${test}`);
-				const style = getComputedStyle(el);
-				const backgroundColor = style.getPropertyValue("background-color");
-				const fontWeight = +style.getPropertyValue("font-weight");
-				const fontSize = +style.getPropertyValue("font-size").replace("px", "");
-				return { color: textColor, backgroundColor, fontWeight, fontSize };
-			}, textColor);
-
-			let elementContrast = 1;
-
-			if (style.backgroundColor && style.backgroundColor != "rgba(0, 0, 0, 0)") {
-				const hexColor = convertToHex(style.color);
-				const hexBgColor = convertToHex(style.backgroundColor);
-				const contrast = WCAG.hex(hexColor, hexBgColor);
-				console.log(
-					`Colors: ${hexColor} (${style.color}) and ${hexBgColor} (${style.backgroundColor}), have contrast: ${contrast}`,
-				);
-				elementContrast = contrast;
-
-				// TODO: Calculate contrast between element's own color and background. DONE
-				// TODO: Compare the element's background to the ancestor's background.
-
-				// TODO: Might implement this:
-				/*const ancestor = await findAncestorWithBackgroundColor(domElement);
-				// TODO: What to do if ancestor is null?
-				if (ancestor) {
-					const ancestorStyle = await ancestor.evaluate((el) => {
-						const style = getComputedStyle(el);
-						const backgroundColor = style.getPropertyValue("background-color");
-						return { backgroundColor };
-					});
-
-					const ancestorHexBgColor = convertToHex(ancestorStyle.backgroundColor);
-					const ancestorContrast = WCAG.hex(hexBgColor, ancestorHexBgColor);
-
-					console.log(
-						`B Text: ${element.text} Contrast between ${hexBgColor} and ancestor ${ancestorHexBgColor} is ${ancestorContrast}. %%%%`,
-					);
-				}*/
-			} else {
-				const ancestor = await findAncestorWithBackgroundColor(domElement);
-				// TODO: What to do if ancestor is null?
-				if (ancestor) {
-					const ancestorStyle = await ancestor.evaluate((el) => {
-						const style = getComputedStyle(el);
-						const backgroundColor = style.getPropertyValue("background-color");
-						return { backgroundColor };
-					});
-
-					const hexColor = convertToHex(style.color);
-					const hexBgColor = convertToHex(ancestorStyle.backgroundColor);
-					const contrast = WCAG.hex(hexColor, hexBgColor);
-					console.log(
-						`Colors: ${hexColor} (${style.color}) and ${hexBgColor} (${ancestorStyle.backgroundColor}), have contrast: ${contrast}`,
-					);
-
-					elementContrast = contrast;
-				}
-				// TODO: Compare the text color to the ancestor's background. DONE
-			}
-
-			const isLargeText = (style.fontSize >= 18.5 && style.fontWeight >= 700) || style.fontSize >= 24;
-
-			let contrastLevel = "FAIL";
-
-			if (isLargeText) {
-				if (elementContrast >= 4.5) {
-					contrastLevel = "AAA";
-				} else if (elementContrast >= 3) {
-					contrastLevel = "AA";
-				}
-			} else {
-				if (elementContrast >= 7) {
-					contrastLevel = "AAA";
-				} else if (elementContrast >= 4.5) {
-					contrastLevel = "AA";
-				}
-			}
-
-			elementContrasts.push({
-				index: element.index,
-				contrastLevel: contrastLevel,
-				contrast: elementContrast,
-				isLargeText: isLargeText,
-			});
-		}
-	}
-
-	return elementContrasts;
-}
+*/
