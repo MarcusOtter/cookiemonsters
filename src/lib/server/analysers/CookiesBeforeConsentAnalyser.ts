@@ -32,21 +32,39 @@ export class CookiesBeforeConsentAnalyser implements AnalysisResult<CookiesBefor
 		}
 
 		const unknownCookies = foundCookies.filter((el) => el.CookieObject == undefined);
-		const knownNecessaryCookies = foundCookies.filter(
+		const knownFunctionalCookies = foundCookies.filter(
 			(el) => el.CookieObject != undefined && el.CookieObject.category == "Functional",
 		);
 		const knownUnnecessaryCookies = foundCookies.filter(
 			(el) => el.CookieObject != undefined && el.CookieObject.category != "Functional",
 		);
 
-		if (knownUnnecessaryCookies.length > 0) {
-			this.resultSummary = `Found ${knownUnnecessaryCookies.length} known unnecessary cookie(s) ${
-				unknownCookies.length > 0 ? `and ${unknownCookies.length} unknown cookie(s) ` : ""
-			}before consent choice.`;
-			this.status = AnalysisStatus.Failed;
-			this.details += `Known unnecessary cookies:`;
+		if (unknownCookies.length == 0 && knownFunctionalCookies.length == 0 && knownUnnecessaryCookies.length == 0) {
+			this.resultSummary = "No cookies were set before consent choice.";
+			this.status = AnalysisStatus.Passed;
+		} else {
+			this.resultSummary = `Found ${knownUnnecessaryCookies.length} known unnecessary cookie(s), ${unknownCookies.length} unknown cookie(s), and ${knownFunctionalCookies.length} known functional cookie(s). The necessity of all cookies should be manually checked.`;
 
-			for (const cookie of knownUnnecessaryCookies) {
+			this.details = `These details are from the Open Cookie Database and are not written by cookiemonsters.eu.
+`;
+		}
+
+		if (unknownCookies.length > 0) {
+			this.status = AnalysisStatus.Warning;
+			this.details += `
+Unknown cookies:`;
+			for (const cookie of unknownCookies) {
+				this.details += `
+Name: ${cookie.ClientCookie.name}
+`;
+			}
+		}
+
+		if (knownFunctionalCookies.length > 0) {
+			this.status = AnalysisStatus.Warning;
+			this.details += `
+Known functional cookies:`;
+			for (const cookie of knownFunctionalCookies) {
 				this.details += `
 Name: ${cookie.ClientCookie.name}
 Type: ${cookie.CookieObject?.category}
@@ -54,39 +72,14 @@ Data Controller: ${cookie.CookieObject?.controller}
 Description: ${cookie.CookieObject?.description}
 `;
 			}
-
-			if (unknownCookies.length > 0) {
-				this.details += `
-Unknown cookies:`;
-				for (const cookie of unknownCookies) {
-					this.details += `
-Name: ${cookie.ClientCookie.name}
-`;
-				}
-			}
-		} else if (unknownCookies.length > 0) {
-			this.resultSummary = `Found ${unknownCookies.length} unknown cookie(s) before consent choice. The necessity of these cookies should be manually checked.`;
-			this.status = AnalysisStatus.Warning;
-			this.details = `Unknown cookies:`;
-			for (const cookie of unknownCookies) {
-				this.details += `
-Name: ${cookie.ClientCookie.name}
-			`;
-			}
-		} else {
-			if (knownNecessaryCookies.length > 0) {
-				this.resultSummary = `Found ${knownNecessaryCookies.length} cookie(s) before consent choice, but they all are known "Functional" cookies.`;
-			} else {
-				this.resultSummary = "No cookies were set before consent choice.";
-			}
-
-			this.status = AnalysisStatus.Passed;
 		}
 
-		if (knownNecessaryCookies.length > 0) {
+		if (knownUnnecessaryCookies.length > 0) {
+			this.status = AnalysisStatus.Failed;
 			this.details += `
-Known necessary cookies:`;
-			for (const cookie of knownNecessaryCookies) {
+Known unnecessary cookies:`;
+
+			for (const cookie of knownUnnecessaryCookies) {
 				this.details += `
 Name: ${cookie.ClientCookie.name}
 Type: ${cookie.CookieObject?.category}
