@@ -29,7 +29,6 @@ import { LanguageAnalyser, type LanguageAnalyserParams } from "$lib/server/analy
 import { NudgingAnalyser, type NudgingAnalyserParams } from "$lib/server/analysers/NudgingAnalyser";
 import { BlockingAnalyser, type BlockingAnalyserParams } from "$lib/server/analysers/BlockingAnalyser";
 import type BannerAnalysisResponse from "$lib/contracts/BannerAnalysisResponse";
-import AnalysisCategories from "$lib/models/AnalysisCategories";
 
 const systemPrompt = `You are a legal assistant and your job is to:
 

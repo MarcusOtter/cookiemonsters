@@ -56,11 +56,15 @@
 	}
 
 	function showDetails(i: number, l: number) {
-		const detailsBox = document.getElementsByClassName(`extra-details-${i}-${l}`)[0] as HTMLElement;
-		const detailsButton = document.getElementsByClassName(`extra-details-button-${i}-${l}`)[0] as HTMLElement;
-		if (detailsBox != null && detailsButton != null) {
+		const detailsBox = document.querySelector(`.extra-details-${i}-${l}`) as HTMLElement;
+		const detailsButton = document.querySelector(`.extra-details-button-${i}-${l}`) as HTMLElement;
+
+		if (detailsBox.style.display === "block") {
+			detailsBox.style.display = "none";
+			detailsButton.innerText = "Show more";
+		} else {
 			detailsBox.style.display = "block";
-			detailsButton.style.display = "none";
+			detailsButton.innerText = "Show less";
 		}
 	}
 </script>
@@ -84,13 +88,13 @@
 		<p class="disclaimer">
 			The results and suggestions provided by cookiemonsters.eu are not legal advice and can be biased and/or incorrect.
 		</p>
-		<a href="#ConsentAndDisclosure" class="details-link">
+		<a href="#{CSS.escape(categories[0].name)}" class="details-link">
 			<p>Details</p>
 			<img src={arrowDown} alt="" width="24" />
 		</a>
 		<div class="details">
 			{#each categories as category, i}
-				<h2 id={category.name}>{category.name}</h2>
+				<h2 id={CSS.escape(category.name)}>{category.name}</h2>
 				<p>{category.description}</p>
 				<div class="category-results {AnalysisStatus[getStatusForCategory(category)].toLowerCase()}">
 					{#each results.filter((res) => res.category.name === category.name) as result, l}
@@ -101,8 +105,8 @@
 							<p>{result.resultSummary}</p>
 
 							{#if result.details}
-								<button on:click|once={() => showDetails(i, l)} class="extra-details-button-{i}-{l}"
-									>Show Details</button
+								<button on:click|preventDefault={() => showDetails(i, l)} class="extra-details-button-{i}-{l}"
+									>Show more</button
 								>
 								<div class="extra-details-{i}-{l}">
 									<hr />
@@ -188,7 +192,7 @@
 		margin-block-start: 16px;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 24px;
 	}
 
 	.category-results.passed {
@@ -273,17 +277,21 @@
 	}
 
 	.result button {
-		background: #1e1e23;
+		background: hsl(240, 8%, 13%);
 		border: solid 1px;
 		border-color: #44464a;
 		border-radius: 6px;
 		padding: 5px 15px;
 		display: block;
 		position: absolute;
-		bottom: -6px;
+		bottom: -20px;
 		left: 50%;
 		transform: translateX(-50%);
 		cursor: pointer;
+	}
+
+	.result button:hover {
+		background: hsl(240, 8%, 20%);
 	}
 
 	hr {

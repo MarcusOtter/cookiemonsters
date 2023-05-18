@@ -1,5 +1,4 @@
 import AnalysisCategories from "$lib/models/AnalysisCategories";
-import type AnalysisCategory from "$lib/models/AnalysisCategory";
 import AnalysisStatus from "$lib/models/AnalysisStatus";
 import type AnalysisResult from "$lib/utils/AnalysisResult";
 import type { ElementHandle, Page } from "puppeteer";

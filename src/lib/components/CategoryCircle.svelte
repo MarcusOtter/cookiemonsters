@@ -66,4 +66,8 @@
 	.circle.failed {
 		border-color: hsl(0, 85%, 72%);
 	}
+
+	.description {
+		max-width: 150px;
+	}
 </style>
